@@ -131,9 +131,11 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	pixels := stb.load_from_memory(raw_data(data), cast(i32) len(data), &width, &height, &channels, 4)
 	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA8 , width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
 	gl.GenerateMipmap(gl.TEXTURE_2D)
-	// if sdl2.GL_ExtensionSupported("GL_EXT_texture_filter_anisotropic") {
-	// 	gl.TexParameterf(gl.TEXTURE_2D, )
-	// }
+	if sdl2.GL_ExtensionSupported("GL_EXT_texture_filter_anisotropic") {
+		filter: f32
+		gl.GetFloatv(gl.MAX_TEXTURE_MAX_ANISOTROPY, &filter)
+		gl.TexParameterf(gl.TEXTURE_2D, gl.TEXTURE_MAX_ANISOTROPY, filter)
+	}
 
 	gl.ClearColor(0.1, 0.1, 0.1, 1.0)
     
@@ -143,7 +145,7 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 }
 
 loop :: proc"c"(core: ^skeewb.core_interface) {
-	//context = runtime.default_context()
+	context = runtime.default_context()
 	
 	duration := time.tick_since(start_tick)
 	t := f32(time.duration_seconds(duration))
