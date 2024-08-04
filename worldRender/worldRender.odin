@@ -147,9 +147,9 @@ makeVertices :: proc(faces: [dynamic]Face) -> ([dynamic]u32, [dynamic]f32) {
                 append(&vertices, posX + 0, posY + 1, posZ + 1, 0, 0, 1, 0, 1)
             case .South:
                 append(&vertices, posX + 0, posY + 0, posZ + 0, 0, 0,-1, 0, 0)
-                append(&vertices, posX + 1, posY + 0, posZ + 0, 0, 0,-1, 0, 1)
+                append(&vertices, posX + 0, posY + 1, posZ + 0, 0, 0,-1, 0, 1)
                 append(&vertices, posX + 1, posY + 1, posZ + 0, 0, 0,-1, 1, 1)
-                append(&vertices, posX + 0, posY + 1, posZ + 0, 0, 0,-1, 1, 0)
+                append(&vertices, posX + 1, posY + 0, posZ + 0, 0, 0,-1, 1, 0)
             case .East:
                 append(&vertices, posX + 1, posY + 0, posZ + 0, 1, 0, 0, 0, 0)
                 append(&vertices, posX + 1, posY + 1, posZ + 0, 1, 0, 0, 0, 1)
@@ -157,9 +157,9 @@ makeVertices :: proc(faces: [dynamic]Face) -> ([dynamic]u32, [dynamic]f32) {
                 append(&vertices, posX + 1, posY + 0, posZ + 1, 1, 0, 0, 1, 0)
             case .West:
                 append(&vertices, posX + 0, posY + 0, posZ + 0,-1, 0, 0, 0, 0)
-                append(&vertices, posX + 0, posY + 1, posZ + 0,-1, 0, 0, 1, 0)
+                append(&vertices, posX + 0, posY + 0, posZ + 1,-1, 0, 0, 1, 0)
                 append(&vertices, posX + 0, posY + 1, posZ + 1,-1, 0, 0, 1, 1)
-                append(&vertices, posX + 0, posY + 0, posZ + 1,-1, 0, 0, 0, 1)
+                append(&vertices, posX + 0, posY + 1, posZ + 0,-1, 0, 0, 0, 1)
         }
         n := u32(len(vertices) / 8)
         append(&indices, n - 4, n - 3, n - 2, n - 2, n - 1, n - 4)

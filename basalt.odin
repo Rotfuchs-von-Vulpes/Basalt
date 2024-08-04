@@ -78,7 +78,7 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	gl.load_up_to(3, 3, sdl2.gl_set_proc_address)
 	
 	gl.Enable(gl.DEPTH_TEST)
-	// gl.Enable(gl.CULL_FACE)
+	gl.Enable(gl.CULL_FACE)
 	// gl.CullFace(gl.BACK)
 	// gl.Enable(gl.BLEND)
 	// gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
@@ -163,7 +163,7 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 		  0,   0,   0, 1,
 	}
 		
-	view := glm.mat4LookAt({16, 2, 16}, {0, 0, 0}, {0, 1, 0})
+	view := glm.mat4LookAt({-10, -10, -10}, {16, 16, 16}, {0, 1, 0})
 	proj := glm.mat4Perspective(45, f32(screenWidth) / f32(screenHeight), 0.1, 100.0)
 
 	gl.UniformMatrix4fv(uniforms["model"].location, 1, false, &model[0, 0])
