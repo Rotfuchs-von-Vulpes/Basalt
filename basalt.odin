@@ -262,7 +262,7 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	model := math.MATRIX4F32_IDENTITY
 		
 	view := glm.mat4LookAt(cameraPos, cameraPos + cameraFront, cameraUp)
-	proj := glm.mat4Perspective(45, f32(screenWidth) / f32(screenHeight), 0.1, 100.0)
+	proj := glm.mat4PerspectiveInfinite(45, f32(screenWidth) / f32(screenHeight), 0.1)
 
 	gl.UniformMatrix4fv(uniforms["model"].location, 1, false, &model[0, 0])
 	gl.UniformMatrix4fv(uniforms["view"].location, 1, false, &view[0, 0])
