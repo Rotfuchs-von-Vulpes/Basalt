@@ -125,7 +125,7 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
-	stb.set_flip_vertically_on_load(1);
+	// stb.set_flip_vertically_on_load(1);
 	width, height, channels: i32
 	data := core.resource_string(core.resource_load("madera", "basalt/assets/textures/default_box.png"))
 	pixels := stb.load_from_memory(raw_data(data), cast(i32) len(data), &width, &height, &channels, 4)
