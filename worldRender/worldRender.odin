@@ -131,10 +131,10 @@ makeVertices :: proc(faces: [dynamic]Face) -> ([dynamic]u32, [dynamic]f32) {
 
         switch face.direction {
             case .Up:
-                append(&vertices, posX + 0, posY + 1, posZ + 0, 0, 1, 0, 0, 1) // 0
-                append(&vertices, posX + 0, posY + 1, posZ + 1, 0, 1, 0, 0, 0) // 1
-                append(&vertices, posX + 1, posY + 1, posZ + 1, 0, 1, 0, 1, 0) // 2
-                append(&vertices, posX + 1, posY + 1, posZ + 0, 0, 1, 0, 1, 1) // 3
+                append(&vertices, posX + 0, posY + 1, posZ + 0, 0, 1, 0, 0, 1)
+                append(&vertices, posX + 0, posY + 1, posZ + 1, 0, 1, 0, 0, 0)
+                append(&vertices, posX + 1, posY + 1, posZ + 1, 0, 1, 0, 1, 0)
+                append(&vertices, posX + 1, posY + 1, posZ + 0, 0, 1, 0, 1, 1)
             case .Bottom:
                 append(&vertices, posX + 0, posY + 0, posZ + 0, 0,-1, 0, 0, 1)
                 append(&vertices, posX + 1, posY + 0, posZ + 0, 0,-1, 0, 1, 1)
