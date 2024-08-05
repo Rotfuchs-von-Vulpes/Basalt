@@ -129,7 +129,7 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	width, height, channels: i32
 	data := core.resource_string(core.resource_load("madera", "basalt/assets/textures/default_box.png"))
 	pixels := stb.load_from_memory(raw_data(data), cast(i32) len(data), &width, &height, &channels, 4)
-	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA8 , width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
+	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
 	gl.GenerateMipmap(gl.TEXTURE_2D)
 	if sdl2.GL_ExtensionSupported("GL_EXT_texture_filter_anisotropic") {
 		filter: f32
@@ -158,14 +158,9 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 		}
 	}
 	
-	model := glm.mat4{
-		  1,   0,   0, 0,
-		  0,   1,   0, 0,
-		  0,   0,   1, 0,
-		  0,   0,   0, 1,
-	}
+	model := math.MATRIX4F32_IDENTITY
 		
-	view := glm.mat4LookAt({-10, -10, -10}, {16, 16, 16}, {0, 1, 0})
+	view := glm.mat4LookAt({-1, -1, -1}, {16, 16, 16}, {0, 1, 0})
 	proj := glm.mat4Perspective(45, f32(screenWidth) / f32(screenHeight), 0.1, 100.0)
 
 	gl.UniformMatrix4fv(uniforms["model"].location, 1, false, &model[0, 0])
