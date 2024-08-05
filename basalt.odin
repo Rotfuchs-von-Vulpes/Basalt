@@ -46,6 +46,8 @@ indi: [dynamic]u32
 
 screenWidth: i32 = 854
 screenHeight: i32 = 480
+deltaTime: f32 = 0.0
+lastFrame: f32 = 0.0
 
 start :: proc"c"(core: ^skeewb.core_interface) {
 	context = runtime.default_context()
@@ -65,6 +67,8 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 		core.quit(-1)
 	}
 	skeewb.console_log(.INFO, "successfully created a window")
+
+	sdl2.SetRelativeMouseMode(true)
 
 	gl_context = sdl2.GL_CreateContext(window);
 	if (gl_context == nil) {
@@ -144,23 +148,117 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	uniforms = gl.get_uniforms_from_program(program)
 }
 
+toFront := false
+toBehind := false
+toRight := false
+toLeft := false
+
+cameraPos := glm.vec3{33, 33, 33}
+cameraFront := glm.vec3{0.0, 0.0, -1.0}
+cameraUp := glm.vec3{0.0, 1.0, 0.0}
+cameraRight := math.cross(cameraFront, cameraUp)
+
+yaw: f32 = -90.0;
+pitch: f32 = 0.0;
+
 loop :: proc"c"(core: ^skeewb.core_interface) {
 	context = runtime.default_context()
 	
 	duration := time.tick_since(start_tick)
 	t := f32(time.duration_seconds(duration))
 
-	event : sdl2.Event
+	event: sdl2.Event
 		
 	for sdl2.PollEvent(&event) {
-		if event.type == sdl2.EventType.QUIT {
+		if event.type == .QUIT {
 			core.quit(0)
+		} else if event.type == .KEYUP {
+			#partial switch (event.key.keysym.sym) {
+				case .ESCAPE:
+					core.quit(0)
+				case .W:
+					toFront = false
+				case .S:
+					toBehind = false
+				case .A:
+					toLeft = false
+				case .D:
+					toRight = false
+			}
+		} else if event.type == .KEYDOWN {
+			#partial switch (event.key.keysym.sym) {
+				case .ESCAPE:
+					core.quit(0)
+				case .W:
+					toFront = true
+				case .S:
+					toBehind = true
+				case .A:
+					toLeft = true
+				case .D:
+					toRight = true
+			}
+		} else if event.type == .MOUSEMOTION {
+			xpos :=  f32(event.motion.xrel)
+			ypos := -f32(event.motion.yrel)
+		
+			sensitivity: f32 = 0.1
+			xoffset := xpos * sensitivity
+			yoffset := ypos * sensitivity
+		
+			yaw += xoffset
+			pitch += yoffset
+
+			if pitch >= 90 {
+				pitch = 90
+			}
+			if pitch <= -90 {
+				pitch = -90
+			}
+		
+			cameraFront = {
+				math.cos(math.RAD_PER_DEG * yaw) * math.cos(math.RAD_PER_DEG * pitch),
+				math.sin(math.RAD_PER_DEG * pitch),
+				math.sin(math.RAD_PER_DEG * yaw) * math.cos(math.RAD_PER_DEG * pitch)
+			}
+			cameraFront = math.vector_normalize(cameraFront)
+			
+			cameraUp = {
+				-math.sin(math.RAD_PER_DEG * pitch) * math.cos(math.RAD_PER_DEG * yaw),
+				 math.cos(math.RAD_PER_DEG * pitch),
+				-math.sin(math.RAD_PER_DEG * pitch) * math.sin(math.RAD_PER_DEG * yaw)
+			}
+			cameraUp = math.vector_normalize(cameraUp)
+
+			cameraRight = math.cross(cameraFront, cameraUp)
 		}
 	}
+
+	cameraSpeed: f32 = 0.125
+	scale: glm.vec3 = {0, 0, 0}
+
+	if toFront != toBehind {
+		if toFront {
+			scale = cameraFront
+		} else {
+			scale = -cameraFront
+		}
+	}
+
+	if toLeft != toRight {
+		if toLeft {
+			scale += -cameraRight
+		} else {
+			scale += cameraRight
+		}
+	}
+
+	if math.length(scale) > 0 {scale = math.vector_normalize(scale) * cameraSpeed}
+	cameraPos += scale;
 	
 	model := math.MATRIX4F32_IDENTITY
 		
-	view := glm.mat4LookAt({-1, -1, -1}, {16, 16, 16}, {0, 1, 0})
+	view := glm.mat4LookAt(cameraPos, cameraPos + cameraFront, cameraUp)
 	proj := glm.mat4Perspective(45, f32(screenWidth) / f32(screenHeight), 0.1, 100.0)
 
 	gl.UniformMatrix4fv(uniforms["model"].location, 1, false, &model[0, 0])
@@ -170,7 +268,6 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 	gl.UseProgram(program)
 
-	// gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, EBO);
 	gl.ActiveTexture(gl.TEXTURE0);
 	gl.BindTexture(gl.TEXTURE_2D, texture);
 	gl.BindVertexArray(VAO);
