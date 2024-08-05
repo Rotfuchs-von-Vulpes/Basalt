@@ -209,24 +209,27 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 			yaw += xoffset
 			pitch += yoffset
 
-			if pitch >= 90 {
-				pitch = 90
+			if pitch >= 89 {
+				pitch = 89
 			}
-			if pitch <= -90 {
-				pitch = -90
+			if pitch <= -89 {
+				pitch = -89
 			}
+
+			yawRadians := yaw * math.RAD_PER_DEG
+			pitchRadians := pitch * math.RAD_PER_DEG
 		
 			cameraFront = {
-				math.cos(math.RAD_PER_DEG * yaw) * math.cos(math.RAD_PER_DEG * pitch),
-				math.sin(math.RAD_PER_DEG * pitch),
-				math.sin(math.RAD_PER_DEG * yaw) * math.cos(math.RAD_PER_DEG * pitch)
+				math.cos(yawRadians) * math.cos(pitchRadians),
+				math.sin(pitchRadians),
+				math.sin(yawRadians) * math.cos(pitchRadians)
 			}
 			cameraFront = math.vector_normalize(cameraFront)
 			
 			cameraUp = {
-				-math.sin(math.RAD_PER_DEG * pitch) * math.cos(math.RAD_PER_DEG * yaw),
-				 math.cos(math.RAD_PER_DEG * pitch),
-				-math.sin(math.RAD_PER_DEG * pitch) * math.sin(math.RAD_PER_DEG * yaw)
+				-math.sin(pitchRadians) * math.cos(yawRadians),
+				 math.cos(pitchRadians),
+				-math.sin(pitchRadians) * math.sin(yawRadians)
 			}
 			cameraUp = math.vector_normalize(cameraUp)
 
