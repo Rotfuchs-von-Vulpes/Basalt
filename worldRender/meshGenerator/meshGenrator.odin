@@ -1,5 +1,6 @@
 package meshGenerator
 
+import "../../skeewb"
 import "../../world"
 
 Pos :: struct {
@@ -58,6 +59,7 @@ isSideExposed :: proc(chunk: world.Chunk, pos: BlockPos, offset: Pos) -> bool {
     }
     if offset.z > 0 && pos.z == 31 {
         sidePos := BlockPos{u8(i8(pos.x) + offset.x), u8(i8(pos.y) + offset.y), 0}
+        // if world.chunkMap[{chunk.x, 0, chunk.z + 1}] == 0 {skeewb.console_log(.INFO, "aaaa")}
         return world.chunks[world.chunkMap[{chunk.x, 0, chunk.z + 1}]].primer[toIndex(sidePos)] == 0
     }
 

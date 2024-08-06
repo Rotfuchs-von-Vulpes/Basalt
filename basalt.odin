@@ -39,7 +39,11 @@ program: u32
 VAO: u32
 texture: u32
 uniforms: map[string]gl.Uniform_Info
+
 chunks: [dynamic]worldRender.ChunkBuffer
+cameraChunkX: i32 = 0
+cameraChunkZ: i32 = 0
+viewDistance: i32 = 6
 
 screenWidth: i32 = 854
 screenHeight: i32 = 480
@@ -98,7 +102,7 @@ start :: proc"c"(core: ^skeewb.core_interface) {
         skeewb.console_log(.ERROR, "could not compile shaders\n %s\n %s", a, c)
     }
 
-	chunks = worldRender.setupManyChunks(world.peak(0, 0, 4))
+	chunks = worldRender.setupManyChunks(world.peak(cameraChunkX, cameraChunkZ, viewDistance))
 	
 	gl.GenTextures(1, &texture)
 	gl.BindTexture(gl.TEXTURE_2D, texture)
@@ -106,7 +110,6 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
-	// stb.set_flip_vertically_on_load(1);
 	width, height, channels: i32
 	data := core.resource_string(core.resource_load("madera", "basalt/assets/textures/default_box.png"))
 	pixels := stb.load_from_memory(raw_data(data), cast(i32) len(data), &width, &height, &channels, 4)
@@ -130,13 +133,16 @@ toBehind := false
 toRight := false
 toLeft := false
 
-cameraPos := glm.vec3{33, 33, 33}
+cameraPos := glm.vec3{1, 33, 1}
 cameraFront := glm.vec3{0.0, 0.0, -1.0}
 cameraUp := glm.vec3{0.0, 1.0, 0.0}
 cameraRight := math.cross(cameraFront, cameraUp)
 
 yaw: f32 = -90.0;
 pitch: f32 = 0.0;
+
+lastChunkX := cameraChunkX
+lastChunkZ := cameraChunkZ
 
 loop :: proc"c"(core: ^skeewb.core_interface) {
 	context = runtime.default_context()
@@ -219,15 +225,15 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 
 	if toFront != toBehind {
 		if toFront {
-			scale = cameraFront
+			scale += cameraFront
 		} else {
-			scale = -cameraFront
+			scale -= cameraFront
 		}
 	}
 
 	if toLeft != toRight {
 		if toLeft {
-			scale += -cameraRight
+			scale -= cameraRight
 		} else {
 			scale += cameraRight
 		}
@@ -236,8 +242,25 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	if math.length(scale) > 0 {scale = math.vector_normalize(scale) * cameraSpeed}
 	cameraPos += scale;
 	
+	chunkX := i32(math.floor(cameraPos.x / 32))
+	chunkZ := i32(math.floor(cameraPos.z / 32))
+	moved := false
 
-	view := glm.mat4LookAt(cameraPos, cameraPos + cameraFront, cameraUp)
+	if (chunkX != lastChunkX) {
+		cameraChunkX = chunkX
+		lastChunkX = chunkX
+		moved = true
+	}
+	if (chunkZ != lastChunkZ) {
+		cameraChunkZ = chunkZ
+		lastChunkZ = chunkZ
+		moved = true
+	}
+	if moved {
+		chunks = worldRender.setupManyChunks(world.peak(cameraChunkX, cameraChunkZ, viewDistance))
+	}
+
+	view := glm.mat4LookAt({0, 0, 0}, cameraFront, cameraUp)
 	proj := glm.mat4PerspectiveInfinite(45, f32(screenWidth) / f32(screenHeight), 0.1)
 
 	gl.UniformMatrix4fv(uniforms["view"].location, 1, false, &view[0, 0])
@@ -250,7 +273,8 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	gl.BindTexture(gl.TEXTURE_2D, texture);
 
 	for chunk in chunks {
-		model := math.matrix4_translate_f32({f32(chunk.x) * 32, 0, f32(chunk.z) * 32})
+		pos := [3]f32{f32(chunk.x) * 32 - cameraPos.x, -cameraPos.y, f32(chunk.z) * 32 - cameraPos.z}
+		model := math.matrix4_translate_f32(pos)
 		gl.UniformMatrix4fv(uniforms["model"].location, 1, false, &model[0, 0])
 
 		gl.BindVertexArray(chunk.VAO);
@@ -262,7 +286,10 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 
 quit :: proc"c"(core: ^skeewb.core_interface){
 	context = runtime.default_context()
+
+	worldRender.nuke()
 	world.nuke()
+
 	delete(uniforms)
 	gl.DeleteProgram(program)
 	gl.DeleteVertexArrays(1, &VAO)
@@ -271,6 +298,7 @@ quit :: proc"c"(core: ^skeewb.core_interface){
 		gl.DeleteBuffers(1, &chunk.EBO)
 	}
 	delete(chunks)
+
 	sdl2.GL_DeleteContext(gl_context)
 	sdl2.DestroyWindow(window)
 	sdl2.Quit()

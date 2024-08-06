@@ -47,12 +47,19 @@ getNewChunk :: proc(x: i32, z: i32) -> Chunk {
     return chunk
 }
 
+eval :: proc(x: i32, z: i32) -> Chunk {
+    pos := iVec3{x, 0, z}
+    if pos in chunkMap {return chunks[chunkMap[pos]]} else {return getNewChunk(x, z)}
+}
+
 peak :: proc(x: i32, z: i32, radius: i32) -> [dynamic]Chunk {
     chunksToView := [dynamic]Chunk{}
+    radiusP := radius + 1
 
-    for i := -radius; i <= radius; i += 1 {
-        for j := -radius; j <= radius; j += 1 {
-            append(&chunksToView, getNewChunk(x + i, z + j))
+    for i := -radiusP; i <= radiusP; i += 1 {
+        for j := -radiusP; j <= radiusP; j += 1 {
+            chunk := eval(x + i, z + j);
+            if (i != -radiusP && i != radiusP) && (j != -radiusP && j != radiusP) {append(&chunksToView, chunk)}
         }
     }
 
