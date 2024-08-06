@@ -36,13 +36,10 @@ start_tick: time.Tick
 window: ^sdl2.Window
 gl_context: sdl2.GLContext
 program: u32
-VBO: u32
 VAO: u32
-EBO: u32
 texture: u32
 uniforms: map[string]gl.Uniform_Info
-mesh: [dynamic]f32
-indi: [dynamic]u32
+chunks: [dynamic]worldRender.ChunkBuffer
 
 screenWidth: i32 = 854
 screenHeight: i32 = 480
@@ -101,27 +98,7 @@ start :: proc"c"(core: ^skeewb.core_interface) {
         skeewb.console_log(.ERROR, "could not compile shaders\n %s\n %s", a, c)
     }
 
-	gl.GenVertexArrays(1, &VAO)
-	gl.BindVertexArray(VAO)
-
-	chunk := world.getNewChunk(0, 0)
-	indi, mesh = worldRender.generateMesh(chunk)
-    
-	gl.GenBuffers(1, &VBO)
-    gl.BindBuffer(gl.ARRAY_BUFFER, VBO)
-    gl.BufferData(gl.ARRAY_BUFFER, len(mesh)*size_of(mesh[0]), raw_data(mesh), gl.STATIC_DRAW)
-	
-	gl.GenBuffers(1, &EBO);
-	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, EBO);
-	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(indi)*size_of(indi[0]), raw_data(indi), gl.STATIC_DRAW); 
-
-	gl.EnableVertexAttribArray(0)
-	gl.EnableVertexAttribArray(1)
-	gl.EnableVertexAttribArray(2)
-	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, 8 * size_of(f32), 0)
-	gl.VertexAttribPointer(1, 3, gl.FLOAT, false, 8 * size_of(f32), 3 * size_of(f32))
-	gl.VertexAttribPointer(2, 2, gl.FLOAT, false, 8 * size_of(f32), 6 * size_of(f32))
-
+	chunks = worldRender.setupManyChunks(world.peak(0, 0, 4))
 	
 	gl.GenTextures(1, &texture)
 	gl.BindTexture(gl.TEXTURE_2D, texture)
@@ -259,12 +236,10 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	if math.length(scale) > 0 {scale = math.vector_normalize(scale) * cameraSpeed}
 	cameraPos += scale;
 	
-	model := math.MATRIX4F32_IDENTITY
-		
+
 	view := glm.mat4LookAt(cameraPos, cameraPos + cameraFront, cameraUp)
 	proj := glm.mat4PerspectiveInfinite(45, f32(screenWidth) / f32(screenHeight), 0.1)
 
-	gl.UniformMatrix4fv(uniforms["model"].location, 1, false, &model[0, 0])
 	gl.UniformMatrix4fv(uniforms["view"].location, 1, false, &view[0, 0])
 	gl.UniformMatrix4fv(uniforms["projection"].location, 1, false, &proj[0, 0])
 
@@ -273,19 +248,29 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 
 	gl.ActiveTexture(gl.TEXTURE0);
 	gl.BindTexture(gl.TEXTURE_2D, texture);
-	gl.BindVertexArray(VAO);
-	gl.DrawElements(gl.TRIANGLES, i32(len(indi)), gl.UNSIGNED_INT, nil)
+
+	for chunk in chunks {
+		model := math.matrix4_translate_f32({f32(chunk.x) * 32, 0, f32(chunk.z) * 32})
+		gl.UniformMatrix4fv(uniforms["model"].location, 1, false, &model[0, 0])
+
+		gl.BindVertexArray(chunk.VAO);
+		gl.DrawElements(gl.TRIANGLES, chunk.length, gl.UNSIGNED_INT, nil)
+	}
 
 	sdl2.GL_SwapWindow(window)
 }
 
 quit :: proc"c"(core: ^skeewb.core_interface){
 	context = runtime.default_context()
+	world.nuke()
 	delete(uniforms)
 	gl.DeleteProgram(program)
 	gl.DeleteVertexArrays(1, &VAO)
-	gl.DeleteBuffers(1, &VBO)
-	gl.DeleteBuffers(1, &EBO)
+	for &chunk in chunks {
+		gl.DeleteBuffers(1, &chunk.VBO)
+		gl.DeleteBuffers(1, &chunk.EBO)
+	}
+	delete(chunks)
 	sdl2.GL_DeleteContext(gl_context)
 	sdl2.DestroyWindow(window)
 	sdl2.Quit()
