@@ -6,9 +6,7 @@ import "core:math"
 
 Primer :: [32 * 32 * 32]u32
 
-iVec3 :: struct {
-    x, y, z: i32
-}
+iVec3 :: [3]i32
 
 Chunk :: struct {
     x: i32,
@@ -16,8 +14,7 @@ Chunk :: struct {
     primer: Primer,
 }
 
-chunks := [dynamic]Chunk{{0, 0, Primer{0..<(32 * 32 * 32) = 1}}}
-chunkMap := make(map[iVec3]u64)
+chunkMap := make(map[iVec3]Chunk)
 
 getNoised :: proc(a, b: i32, c, d: int) -> int {
     posX := f64(a)
@@ -40,16 +37,18 @@ getNewChunk :: proc(x: i32, z: i32) -> Chunk {
     }
 
     chunk := Chunk{x, z, primer}
-    chunkMap[{x, 0, z}] = u64(len(chunks))
-
-    append(&chunks, chunk)
+    chunkMap[{x, 0, z}] = chunk
 
     return chunk
 }
 
 eval :: proc(x: i32, z: i32) -> Chunk {
     pos := iVec3{x, 0, z}
-    if pos in chunkMap {return chunks[chunkMap[pos]]} else {return getNewChunk(x, z)}
+    chunk, ok := chunkMap[pos]
+    if !ok {
+        chunk = getNewChunk(x, z)
+    }
+    return chunk
 }
 
 peak :: proc(x: i32, z: i32, radius: i32) -> [dynamic]Chunk {
@@ -67,6 +66,5 @@ peak :: proc(x: i32, z: i32, radius: i32) -> [dynamic]Chunk {
 }
 
 nuke :: proc() {
-    delete(chunks)
     delete(chunkMap)
 }

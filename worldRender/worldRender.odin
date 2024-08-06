@@ -15,8 +15,7 @@ iVec3 :: struct {
     x, y, z: i32
 }
 
-chunkMap := make(map[iVec3]u64)
-chunksCache: [dynamic]ChunkBuffer
+chunkMap := make(map[iVec3]ChunkBuffer)
 
 setupChunk :: proc(chunk: world.Chunk) -> ChunkBuffer {
     indices, vertices := mesh.generateMesh(chunk)
@@ -41,15 +40,18 @@ setupChunk :: proc(chunk: world.Chunk) -> ChunkBuffer {
 	gl.VertexAttribPointer(2, 2, gl.FLOAT, false, 8 * size_of(f32), 6 * size_of(f32))
 
 	chunkBuffer := ChunkBuffer{chunk.x, chunk.z, VAO, VBO, EBO, i32(len(indices))}
-	chunkMap[{chunk.x, 0, chunk.z}] = u64(len(chunksCache))
-	append(&chunksCache, chunkBuffer)
+	chunkMap[{chunk.x, 0, chunk.z}] = chunkBuffer
 
     return chunkBuffer
 }
 
 eval :: proc(chunk: world.Chunk) -> ChunkBuffer {
     pos := iVec3{chunk.x, 0, chunk.z}
-    if pos in chunkMap {return chunksCache[chunkMap[pos]]} else {return setupChunk(chunk)}
+    chunkBuffer, ok := chunkMap[pos]
+    if !ok {
+        chunkBuffer = setupChunk(chunk)
+    }
+    return chunkBuffer
 }
 
 setupManyChunks :: proc(chunks: [dynamic]world.Chunk) -> [dynamic]ChunkBuffer {
@@ -63,6 +65,5 @@ setupManyChunks :: proc(chunks: [dynamic]world.Chunk) -> [dynamic]ChunkBuffer {
 }
 
 nuke :: proc() {
-    delete(chunksCache)
     delete(chunkMap)
 }
