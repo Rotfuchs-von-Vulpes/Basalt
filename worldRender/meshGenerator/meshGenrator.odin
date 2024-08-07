@@ -3,6 +3,8 @@ package meshGenerator
 import "../../skeewb"
 import "../../world"
 
+Primers :: [3 * 3]^world.Chunk
+
 Pos :: struct {
     x, y, z: i8
 }
@@ -12,7 +14,6 @@ BlockPos :: struct {
 }
 
 Direction :: enum{Up, Bottom, North, South, East, West}
-Primers :: struct{north, south, east, west: ^world.Chunk}
 FaceSet :: bit_set[Direction]
 
 Cube :: struct {
@@ -68,12 +69,12 @@ isSideExposed :: proc(primer: world.Primer, sidePrimer: world.Primer, pos: Block
 }
 
 hasSideExposed :: proc(primer: world.Primer, primers: Primers, pos: BlockPos) -> bool {
-    if isSideExposed(primer, primers.west.primer, pos, Pos{-1, 0, 0}) {return true}
-    if isSideExposed(primer, primers.east.primer, pos, Pos{ 1, 0, 0}) {return true}
-    if isSideExposed(primer, primers.north.primer, pos, Pos{ 0,-1, 0}) {return true}
-    if isSideExposed(primer, primers.north.primer, pos, Pos{ 0, 1, 0}) {return true}
-    if isSideExposed(primer, primers.south.primer, pos, Pos{ 0, 0,-1}) {return true}
-    if isSideExposed(primer, primers.north.primer, pos, Pos{ 0, 0, 1}) {return true}
+    if isSideExposed(primer, primers[0 * 3 + 1].primer, pos, Pos{-1, 0, 0}) {return true}
+    if isSideExposed(primer, primers[2 * 3 + 1].primer, pos, Pos{ 1, 0, 0}) {return true}
+    if isSideExposed(primer, primers[0 * 3 + 0].primer, pos, Pos{ 0,-1, 0}) {return true}
+    if isSideExposed(primer, primers[0 * 3 + 0].primer, pos, Pos{ 0, 1, 0}) {return true}
+    if isSideExposed(primer, primers[1 * 3 + 0].primer, pos, Pos{ 0, 0,-1}) {return true}
+    if isSideExposed(primer, primers[1 * 3 + 2].primer, pos, Pos{ 0, 0, 1}) {return true}
 
     return false
 }
@@ -104,12 +105,12 @@ makeCubes :: proc(primer: world.Primer, primers: Primers, cubes: [dynamic]Cube) 
         pos := cube.pos
         faces := FaceSet{}
 
-        if isSideExposed(primer, primers.west.primer, pos, Pos{-1, 0, 0}) {faces = faces + {.West}};
-        if isSideExposed(primer, primers.east.primer, pos, Pos{ 1, 0, 0}) {faces = faces + {.East}};
-        if isSideExposed(primer, primers.north.primer, pos, Pos{ 0,-1, 0}) {faces = faces + {.Bottom}};
-        if isSideExposed(primer, primers.north.primer, pos, Pos{ 0, 1, 0}) {faces = faces + {.Up}};
-        if isSideExposed(primer, primers.south.primer, pos, Pos{ 0, 0,-1}) {faces = faces + {.South}};
-        if isSideExposed(primer, primers.north.primer, pos, Pos{ 0, 0, 1}) {faces = faces + {.North}};
+        if isSideExposed(primer, primers[0 * 3 + 1].primer, pos, Pos{-1, 0, 0}) {faces = faces + {.West}};
+        if isSideExposed(primer, primers[2 * 3 + 1].primer, pos, Pos{ 1, 0, 0}) {faces = faces + {.East}};
+        if isSideExposed(primer, primers[0 * 3 + 0].primer, pos, Pos{ 0,-1, 0}) {faces = faces + {.Bottom}};
+        if isSideExposed(primer, primers[0 * 3 + 0].primer, pos, Pos{ 0, 1, 0}) {faces = faces + {.Up}};
+        if isSideExposed(primer, primers[1 * 3 + 0].primer, pos, Pos{ 0, 0,-1}) {faces = faces + {.South}};
+        if isSideExposed(primer, primers[1 * 3 + 2].primer, pos, Pos{ 0, 0, 1}) {faces = faces + {.North}};
 
         append(&cubesFaces, CubeFaces{cube.id, pos, faces})
     }
@@ -186,11 +187,12 @@ generateMesh :: proc(chunk: world.Chunk) -> ([dynamic]u32, [dynamic]f32) {
     x := chunk.x
     z := chunk.z
     
-    primers := Primers{
-        &world.chunkMap[{x, 0, z + 1}],
-        &world.chunkMap[{x, 0, z - 1}],
-        &world.chunkMap[{x + 1, 0, z}],
-        &world.chunkMap[{x - 1, 0, z}],
+    primers: Primers
+
+    for i: i32 = 0; i < 3; i += 1 {
+        for j: i32 = 0; j < 3; j += 1 {
+            primers[i * 3 + j] = &world.chunkMap[{x + i - 1, 0, z + j - 1}]
+        }
     }
 
     cubes := filterCubes(primer, primers)
