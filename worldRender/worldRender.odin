@@ -3,6 +3,7 @@ package worldRender
 import gl "vendor:OpenGL"
 
 import "../world"
+import "../util"
 import mesh "meshGenerator"
 
 ChunkBuffer :: struct{
@@ -47,11 +48,11 @@ setupChunk :: proc(chunk: world.Chunk) -> ChunkBuffer {
 
 eval :: proc(chunk: world.Chunk) -> ChunkBuffer {
     pos := iVec3{chunk.x, 0, chunk.z}
-    chunkBuffer, ok := chunkMap[pos]
-    if !ok {
-        chunkBuffer = setupChunk(chunk)
+    chunkBuffer, ok, _ := util.map_force_get(&chunkMap, pos)
+    if ok {
+        chunkBuffer^ = setupChunk(chunk)
     }
-    return chunkBuffer
+    return chunkBuffer^
 }
 
 setupManyChunks :: proc(chunks: [dynamic]world.Chunk) -> [dynamic]ChunkBuffer {

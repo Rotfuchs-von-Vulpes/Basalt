@@ -3,6 +3,7 @@ package world
 import "../skeewb"
 import "core:math/noise"
 import "core:math"
+import "../util"
 
 Primer :: [32 * 32 * 32]u32
 
@@ -44,11 +45,11 @@ getNewChunk :: proc(x: i32, z: i32) -> Chunk {
 
 eval :: proc(x: i32, z: i32) -> Chunk {
     pos := iVec3{x, 0, z}
-    chunk, ok := chunkMap[pos]
-    if !ok {
-        chunk = getNewChunk(x, z)
+    chunk, ok, _ := util.map_force_get(&chunkMap, pos)
+    if ok {
+        chunk^ = getNewChunk(x, z)
     }
-    return chunk
+    return chunk^
 }
 
 peak :: proc(x: i32, z: i32, radius: i32) -> [dynamic]Chunk {
