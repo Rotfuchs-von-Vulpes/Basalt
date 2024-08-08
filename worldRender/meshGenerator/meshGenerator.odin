@@ -179,6 +179,7 @@ makeVertices :: proc(faces: [dynamic]Face, primer: world.Primer, primers: Primer
         posZ := f32(pos.z)
 
         vertexAo: [4]f32
+        toFlip: bool
         switch face.direction {
             case .Up:
                 vertexAo = {
@@ -191,6 +192,7 @@ makeVertices :: proc(faces: [dynamic]Face, primer: world.Primer, primers: Primer
                 append(&vertices, posX + 0, posY + 1, posZ + 1, 0, 1, 0, 0, 0, vertexAo[1])
                 append(&vertices, posX + 1, posY + 1, posZ + 1, 0, 1, 0, 1, 0, vertexAo[2])
                 append(&vertices, posX + 1, posY + 1, posZ + 0, 0, 1, 0, 1, 1, vertexAo[3])
+                toFlip = toFlipe(vertexAo[3], vertexAo[0], vertexAo[2], vertexAo[1])
             case .Bottom:
                 vertexAo = {
                     getAO(pos, Pos{-1,-1,-1}, Pos{ 0,-1, 0}, primer, primers),
@@ -202,6 +204,7 @@ makeVertices :: proc(faces: [dynamic]Face, primer: world.Primer, primers: Primer
                 append(&vertices, posX + 1, posY + 0, posZ + 0, 0,-1, 0, 1, 1, vertexAo[1])
                 append(&vertices, posX + 1, posY + 0, posZ + 1, 0,-1, 0, 1, 0, vertexAo[2])
                 append(&vertices, posX + 0, posY + 0, posZ + 1, 0,-1, 0, 0, 0, vertexAo[3])
+                toFlip = toFlipe(vertexAo[1], vertexAo[0], vertexAo[2], vertexAo[3])
             case .North:
                 vertexAo = {
                     getAO(pos, Pos{-1,-1, 1}, Pos{ 0, 0, 1}, primer, primers),
@@ -213,6 +216,7 @@ makeVertices :: proc(faces: [dynamic]Face, primer: world.Primer, primers: Primer
                 append(&vertices, posX + 1, posY + 0, posZ + 1, 0, 0, 1, 1, 1, vertexAo[1])
                 append(&vertices, posX + 1, posY + 1, posZ + 1, 0, 0, 1, 1, 0, vertexAo[2])
                 append(&vertices, posX + 0, posY + 1, posZ + 1, 0, 0, 1, 0, 0, vertexAo[3])
+                toFlip = toFlipe(vertexAo[1], vertexAo[0], vertexAo[2], vertexAo[3])
             case .South:
                 vertexAo = {
                     getAO(pos, Pos{-1,-1,-1}, Pos{ 0, 0,-1}, primer, primers),
@@ -224,6 +228,7 @@ makeVertices :: proc(faces: [dynamic]Face, primer: world.Primer, primers: Primer
                 append(&vertices, posX + 0, posY + 1, posZ + 0, 0, 0,-1, 1, 0, vertexAo[1])
                 append(&vertices, posX + 1, posY + 1, posZ + 0, 0, 0,-1, 0, 0, vertexAo[2])
                 append(&vertices, posX + 1, posY + 0, posZ + 0, 0, 0,-1, 0, 1, vertexAo[3])
+                toFlip = toFlipe(vertexAo[3], vertexAo[0], vertexAo[2], vertexAo[1])
             case .East:
                 vertexAo = {
                     getAO(pos, Pos{ 1,-1,-1}, Pos{ 1, 0, 0}, primer, primers),
@@ -235,6 +240,7 @@ makeVertices :: proc(faces: [dynamic]Face, primer: world.Primer, primers: Primer
                 append(&vertices, posX + 1, posY + 1, posZ + 0, 1, 0, 0, 1, 0, vertexAo[1])
                 append(&vertices, posX + 1, posY + 1, posZ + 1, 1, 0, 0, 0, 0, vertexAo[2])
                 append(&vertices, posX + 1, posY + 0, posZ + 1, 1, 0, 0, 0, 1, vertexAo[3])
+                toFlip = toFlipe(vertexAo[3], vertexAo[0], vertexAo[2], vertexAo[1])
             case .West:
                 vertexAo = {
                     getAO(pos, Pos{-1,-1,-1}, Pos{-1, 0, 0}, primer, primers),
@@ -246,9 +252,9 @@ makeVertices :: proc(faces: [dynamic]Face, primer: world.Primer, primers: Primer
                 append(&vertices, posX + 0, posY + 0, posZ + 1,-1, 0, 0, 1, 1, vertexAo[1])
                 append(&vertices, posX + 0, posY + 1, posZ + 1,-1, 0, 0, 1, 0, vertexAo[2])
                 append(&vertices, posX + 0, posY + 1, posZ + 0,-1, 0, 0, 0, 0, vertexAo[3])
+                toFlip = toFlipe(vertexAo[1], vertexAo[0], vertexAo[2], vertexAo[3])
         }
         n := u32(len(vertices) / 9)
-        toFlip := toFlipe(vertexAo[3], vertexAo[0], vertexAo[2], vertexAo[1])
         if !toFlip {
             append(&indices, n - 4, n - 3, n - 2, n - 2, n - 1, n - 4)
         } else {
