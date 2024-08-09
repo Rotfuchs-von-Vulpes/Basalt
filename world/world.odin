@@ -37,9 +37,7 @@ getNewChunk :: proc(x: i32, z: i32) -> Chunk {
         }
     }
 
-    chunk := Chunk{x, z, primer}
-
-    return chunk
+    return Chunk{x, z, primer}
 }
 
 eval :: proc(x: i32, z: i32) -> Chunk {
