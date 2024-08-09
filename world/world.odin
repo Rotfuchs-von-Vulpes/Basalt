@@ -38,7 +38,6 @@ getNewChunk :: proc(x: i32, z: i32) -> Chunk {
     }
 
     chunk := Chunk{x, z, primer}
-    chunkMap[{x, 0, z}] = chunk
 
     return chunk
 }

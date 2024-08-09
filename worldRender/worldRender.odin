@@ -43,7 +43,6 @@ setupChunk :: proc(chunk: world.Chunk) -> ChunkBuffer {
 	gl.VertexAttribPointer(3, 1, gl.FLOAT, false, 9 * size_of(f32), 8 * size_of(f32))
 
 	chunkBuffer := ChunkBuffer{chunk.x, chunk.z, VAO, VBO, EBO, i32(len(indices))}
-	chunkMap[{chunk.x, 0, chunk.z}] = chunkBuffer
 
     return chunkBuffer
 }
