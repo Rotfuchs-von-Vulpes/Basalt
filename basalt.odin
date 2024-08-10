@@ -18,7 +18,7 @@ vert_raw :: #load("assets/shaders/test_vert.glsl")
 frag_raw :: #load("assets/shaders/test_frag.glsl")
 
 @(export)
-load :: proc"c"(core: ^skeewb.core_interface) -> skeewb.module_desc {
+load :: proc "c" (core: ^skeewb.core_interface) -> skeewb.module_desc {
 	context = runtime.default_context()
 
 	core.event_listen("start", skeewb.event_callback(start));
@@ -41,7 +41,7 @@ VAO: u32
 texture: u32
 uniforms: map[string]gl.Uniform_Info
 
-chunks: [dynamic]worldRender.ChunkBuffer
+chunks: [dynamic]worldRender.ChunkBuffer = {}
 cameraChunkX: i32 = 0
 cameraChunkZ: i32 = 0
 viewDistance: i32 = 6
@@ -53,14 +53,13 @@ lastFrame: f32 = 0.0
 
 tracking_allocator: ^mem.Tracking_Allocator
 
-start :: proc"c"(core: ^skeewb.core_interface) {
+start :: proc "c" (core: ^skeewb.core_interface) {
 	context = runtime.default_context()
 
 	tracking_allocator = new(mem.Tracking_Allocator)
 	mem.tracking_allocator_init(tracking_allocator, context.allocator)
 	context.allocator = mem.tracking_allocator(tracking_allocator)
 	
-
 	start_tick = time.tick_now()
 
 	sdl2.Init(sdl2.INIT_EVERYTHING)
@@ -70,7 +69,7 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	sdl2.GL_SetAttribute(sdl2.GLattr.CONTEXT_PROFILE_MASK, i32(sdl2.GLprofile.CORE))
 
 
-	window = sdl2.CreateWindow("AAAAAAAAAAAAAAAAAAA", sdl2.WINDOWPOS_CENTERED, sdl2.WINDOWPOS_CENTERED, screenWidth, screenHeight, sdl2.WINDOW_RESIZABLE | sdl2.WINDOW_OPENGL)
+	window = sdl2.CreateWindow("testando se muda alguma coisa", sdl2.WINDOWPOS_CENTERED, sdl2.WINDOWPOS_CENTERED, screenWidth, screenHeight, sdl2.WINDOW_RESIZABLE | sdl2.WINDOW_OPENGL)
 	if (window == nil) {
 		skeewb.console_log(.ERROR, "could not create a window sdl error: %s", sdl2.GetError())
 		core.quit(-1)
@@ -110,7 +109,9 @@ start :: proc"c"(core: ^skeewb.core_interface) {
         skeewb.console_log(.ERROR, "could not compile shaders\n %s\n %s", a, c)
     }
 
-	chunks = worldRender.setupManyChunks(world.peak(cameraChunkX, 0, cameraChunkZ, viewDistance))
+	tmp := world.peak(cameraChunkX, 0, cameraChunkZ, viewDistance)
+	defer delete(tmp)
+	chunks = worldRender.setupManyChunks(tmp)
 	
 	gl.GenTextures(1, &texture)
 	gl.BindTexture(gl.TEXTURE_2D, texture)
@@ -141,11 +142,11 @@ toBehind := false
 toRight := false
 toLeft := false
 
-cameraPos := glm.vec3{1, 33, 1}
+cameraPos := glm.vec3{1, 31, 1}
 cameraFront := glm.vec3{0.0, 0.0, -1.0}
 cameraUp := glm.vec3{0.0, 1.0, 0.0}
 cameraRight := math.cross(cameraFront, cameraUp)
-moved := true
+moved: bool
 
 yaw: f32 = -90.0;
 pitch: f32 = 0.0;
@@ -153,8 +154,9 @@ pitch: f32 = 0.0;
 lastChunkX := cameraChunkX
 lastChunkZ := cameraChunkZ
 
-loop :: proc"c"(core: ^skeewb.core_interface) {
+loop :: proc "c" (core: ^skeewb.core_interface) {
 	context = runtime.default_context()
+	context.allocator = mem.tracking_allocator(tracking_allocator)
 	
 	duration := time.tick_since(start_tick)
 	t := f32(time.duration_seconds(duration))
@@ -162,11 +164,13 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	event: sdl2.Event
 		
 	for sdl2.PollEvent(&event) {
-		if event.type == .QUIT {
+		if event.type == .QUIT || event.type == .WINDOWEVENT && event.window.event == .CLOSE {
+			quit(core)
 			core.quit(0)
 		} else if event.type == .KEYUP {
 			#partial switch (event.key.keysym.sym) {
 				case .ESCAPE:
+					quit(core)
 					core.quit(0)
 				case .W:
 					toFront = false
@@ -180,6 +184,7 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 		} else if event.type == .KEYDOWN {
 			#partial switch (event.key.keysym.sym) {
 				case .ESCAPE:
+					quit(core)
 					core.quit(0)
 				case .W:
 					toFront = true
@@ -253,6 +258,7 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	
 	chunkX := i32(math.floor(cameraPos.x / 32))
 	chunkZ := i32(math.floor(cameraPos.z / 32))
+	moved = false
 
 	if (chunkX != lastChunkX) {
 		cameraChunkX = chunkX
@@ -266,12 +272,16 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	}
 	if moved {
 		skeewb.console_log(.INFO, "moved!")
-		chunks = worldRender.setupManyChunks(world.peak(cameraChunkX, 0, cameraChunkZ, viewDistance))
-		moved = false
+		if chunks != nil {
+			delete(chunks)
+		}
+		tmp := world.peak(cameraChunkX, 0, cameraChunkZ, viewDistance)
+		defer delete(tmp)
+		chunks = worldRender.setupManyChunks(tmp)
 	}
 
 	view := glm.mat4LookAt({0, 0, 0}, cameraFront, cameraUp)
-	proj := glm.mat4Perspective(45, f32(screenWidth) / f32(screenHeight), 0.1, 1000)
+	proj := glm.mat4PerspectiveInfinite(45, f32(screenWidth) / f32(screenHeight), 0.1)
 
 	gl.UniformMatrix4fv(uniforms["view"].location, 1, false, &view[0, 0])
 	gl.UniformMatrix4fv(uniforms["projection"].location, 1, false, &proj[0, 0])
@@ -283,10 +293,10 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	gl.BindTexture(gl.TEXTURE_2D, texture);
 
 	for chunk in chunks {
-		pos := [3]f32{f32(chunk.x) * 32 - cameraPos.x, - cameraPos.y, f32(chunk.z) * 32 - cameraPos.z}
+		pos := [3]f32{f32(chunk.x) * 32 - cameraPos.x, f32(chunk.y) * 32 - cameraPos.y, f32(chunk.z) * 32 - cameraPos.z}
 		model := math.matrix4_translate_f32(pos)
 		gl.UniformMatrix4fv(uniforms["model"].location, 1, false, &model[0, 0])
-	
+
 		gl.BindVertexArray(chunk.VAO);
 		gl.DrawElements(gl.TRIANGLES, chunk.length, gl.UNSIGNED_INT, nil)
 	}
@@ -294,21 +304,41 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	sdl2.GL_SwapWindow(window)
 }
 
-quit :: proc"c"(core: ^skeewb.core_interface){
+quit :: proc "c" (core: ^skeewb.core_interface){
 	context = runtime.default_context()
+	prev_allocator := context.allocator
+	context.allocator = mem.tracking_allocator(tracking_allocator)
 
-	free(tracking_allocator)
-	mem.tracking_allocator_destroy(tracking_allocator)
-
+	defer free(tracking_allocator)
+	defer context.allocator = prev_allocator
+	defer mem.tracking_allocator_destroy(tracking_allocator)
+	
 	worldRender.nuke()
 	world.nuke()
 
+	for key, value in uniforms {
+		delete(value.name)
+	}
 	delete(uniforms)
 	gl.DeleteProgram(program)
 	gl.DeleteVertexArrays(1, &VAO)
+	for &chunk in chunks {
+		gl.DeleteBuffers(1, &chunk.VBO)
+		gl.DeleteBuffers(1, &chunk.EBO)
+	}
 	delete(chunks)
-
+	
 	sdl2.GL_DeleteContext(gl_context)
 	sdl2.DestroyWindow(window)
 	sdl2.Quit()
+	
+	temp := runtime.default_temp_allocator_temp_begin()
+	defer runtime.default_temp_allocator_temp_end(temp)
+	skeewb.console_log(.INFO, "printing leaks...")
+	for _, leak in tracking_allocator.allocation_map {
+		skeewb.console_log(.INFO, fmt.tprintf("%v leaked %m\n", leak.location, leak.size))
+	}
+	for bad_free in tracking_allocator.bad_free_array {
+		skeewb.console_log(.INFO, fmt.tprintf("%v allocation %p was freed badly\n", bad_free.location, bad_free.memory))
+	}
 }

@@ -16,7 +16,7 @@ Chunk :: struct {
 
 chunkMap := make(map[iVec3]Chunk)
 
-getNoised :: proc(a, b: i32, c, d: int) -> int {
+getNoised :: proc (a, b: i32, c, d: int) -> int {
     posX := f64(a)
     posZ := f64(b)
     x := f64(c)
@@ -24,7 +24,7 @@ getNoised :: proc(a, b: i32, c, d: int) -> int {
     return int(math.floor(32 * (0.5 * noise.noise_2d(0, {posX + x / 32, posZ + z / 32}) + 0.5)))
 }
 
-getNewChunk :: proc(x, y, z: i32) -> Chunk {
+getNewChunk :: proc (x, y, z: i32) -> Chunk {
     primer := Primer{0..<(32 * 32 * 32) = 0}
 
     for i in 0..<32 {
@@ -39,7 +39,7 @@ getNewChunk :: proc(x, y, z: i32) -> Chunk {
     return Chunk{x, y, z, primer}
 }
 
-eval :: proc(x, y, z: i32) -> Chunk {
+eval :: proc (x, y, z: i32) -> Chunk {
     pos := iVec3{x, y, z}
     chunk, ok, _ := util.map_force_get(&chunkMap, pos)
     if ok {
@@ -48,7 +48,7 @@ eval :: proc(x, y, z: i32) -> Chunk {
     return chunk^
 }
 
-peak :: proc(x, y, z: i32, radius: i32) -> [dynamic]Chunk {
+peak :: proc (x, y, z: i32, radius: i32) -> [dynamic]Chunk {
     chunksToView := [dynamic]Chunk{}
     radiusP := radius + 1
 
@@ -64,6 +64,6 @@ peak :: proc(x, y, z: i32, radius: i32) -> [dynamic]Chunk {
     return chunksToView
 }
 
-nuke :: proc() {
+nuke :: proc () {
     delete(chunkMap)
 }

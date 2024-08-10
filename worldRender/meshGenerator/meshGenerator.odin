@@ -40,15 +40,15 @@ Face :: struct {
     corners: CornersSet,
 }
 
-signPos :: proc(pos: BlockPos) -> Pos {
+signPos :: proc (pos: BlockPos) -> Pos {
     return {i8(pos.x), i8(pos.y), i8(pos.z)}
 }
 
-toIndex :: proc(pos: BlockPos) -> u16 {
+toIndex :: proc (pos: BlockPos) -> u16 {
     return u16(pos.x) * 32 * 32 + u16(pos.y) + u16(pos.z) * 32
 }
 
-isSideExposed :: proc(primer: world.Primer, primers: Primers, pos: BlockPos, offset: Pos) -> bool {
+isSideExposed :: proc (primer: world.Primer, primers: Primers, pos: BlockPos, offset: Pos) -> bool {
     x := offset.x
     y := offset.y
     z := offset.z
@@ -88,7 +88,7 @@ isSideExposed :: proc(primer: world.Primer, primers: Primers, pos: BlockPos, off
     return primers[(chunkXOffset + 1) * 3 + chunkZOffset + 1].primer[toIndex(sidePos)] == 0;
 }
 
-hasSideExposed :: proc(primer: world.Primer, primers: Primers, pos: BlockPos) -> bool {
+hasSideExposed :: proc (primer: world.Primer, primers: Primers, pos: BlockPos) -> bool {
     if isSideExposed(primer, primers, pos, Pos{-1, 0, 0}) {return true}
     if isSideExposed(primer, primers, pos, Pos{ 1, 0, 0}) {return true}
     if isSideExposed(primer, primers, pos, Pos{ 0,-1, 0}) {return true}
@@ -99,7 +99,7 @@ hasSideExposed :: proc(primer: world.Primer, primers: Primers, pos: BlockPos) ->
     return false
 }
 
-filterCubes :: proc(primer: world.Primer, primers: Primers) -> [dynamic]Cube {
+filterCubes :: proc (primer: world.Primer, primers: Primers) -> [dynamic]Cube {
     filtered := [dynamic]Cube{}
 
     for i in 0..<32 {
@@ -118,7 +118,7 @@ filterCubes :: proc(primer: world.Primer, primers: Primers) -> [dynamic]Cube {
     return filtered
 }
 
-makeCubes :: proc(primer: world.Primer, primers: Primers, cubes: [dynamic]Cube) -> [dynamic]CubeFaces {
+makeCubes :: proc (primer: world.Primer, primers: Primers, cubes: [dynamic]Cube) -> [dynamic]CubeFaces {
     cubesFaces := [dynamic]CubeFaces{}
 
     for cube in cubes {
@@ -138,7 +138,7 @@ makeCubes :: proc(primer: world.Primer, primers: Primers, cubes: [dynamic]Cube) 
     return cubesFaces;
 }
 
-makeFaces :: proc(cubesFaces: [dynamic]CubeFaces) -> [dynamic]Face {
+makeFaces :: proc (cubesFaces: [dynamic]CubeFaces) -> [dynamic]Face {
     faces := [dynamic]Face{}
 
     for cube in cubesFaces {
@@ -153,7 +153,7 @@ makeFaces :: proc(cubesFaces: [dynamic]CubeFaces) -> [dynamic]Face {
     return faces
 }
 
-getAO :: proc(pos: BlockPos, offset: Pos, normal: Pos, primer: world.Primer, primers: Primers) -> f32 {
+getAO :: proc (pos: BlockPos, offset: Pos, normal: Pos, primer: world.Primer, primers: Primers) -> f32 {
     corner := !isSideExposed(primer, primers, pos, Pos{offset.x, normal.y, offset.z})
     side1  := !isSideExposed(primer, primers, pos, Pos{normal.x, offset.y, offset.z})
     side2  := !isSideExposed(primer, primers, pos, Pos{offset.x, offset.y, normal.z})
@@ -164,11 +164,11 @@ getAO :: proc(pos: BlockPos, offset: Pos, normal: Pos, primer: world.Primer, pri
     return f32(3 - (int(side1) + int(side2) + int(corner)))
 }
 
-toFlipe :: proc(a00, a01, a10, a11: f32) -> bool {
+toFlipe :: proc (a00, a01, a10, a11: f32) -> bool {
 	return a00 + a11 > a01 + a10;
 }
 
-makeVertices :: proc(faces: [dynamic]Face, primer: world.Primer, primers: Primers) -> ([dynamic]u32, [dynamic]f32) {
+makeVertices :: proc (faces: [dynamic]Face, primer: world.Primer, primers: Primers) -> ([dynamic]u32, [dynamic]f32) {
     vertices := [dynamic]f32{}
     indices := [dynamic]u32{}
 
@@ -265,7 +265,7 @@ makeVertices :: proc(faces: [dynamic]Face, primer: world.Primer, primers: Primer
     return indices, vertices
 }
 
-generateMesh :: proc(chunk: world.Chunk) -> ([dynamic]u32, [dynamic]f32) {
+generateMesh :: proc (chunk: world.Chunk) -> ([dynamic]u32, [dynamic]f32) {
     primer := chunk.primer
     x := chunk.x
     z := chunk.z
