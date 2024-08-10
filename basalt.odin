@@ -1,8 +1,9 @@
 package basalt
 
-import "core:fmt";
+import "core:fmt"
 import "core:time"
-import math "core:math/linalg";
+import "core:mem"
+import math "core:math/linalg"
 import glm "core:math/linalg/glsl"
 import "skeewb"
 import "base:runtime"
@@ -50,8 +51,15 @@ screenHeight: i32 = 480
 deltaTime: f32 = 0.0
 lastFrame: f32 = 0.0
 
+tracking_allocator: ^mem.Tracking_Allocator
+
 start :: proc"c"(core: ^skeewb.core_interface) {
 	context = runtime.default_context()
+
+	tracking_allocator = new(mem.Tracking_Allocator)
+	mem.tracking_allocator_init(tracking_allocator, context.allocator)
+	context.allocator = mem.tracking_allocator(tracking_allocator)
+	
 
 	start_tick = time.tick_now()
 
@@ -62,7 +70,7 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	sdl2.GL_SetAttribute(sdl2.GLattr.CONTEXT_PROFILE_MASK, i32(sdl2.GLprofile.CORE))
 
 
-	window = sdl2.CreateWindow("testando se muda alguma coisa", sdl2.WINDOWPOS_CENTERED, sdl2.WINDOWPOS_CENTERED, screenWidth, screenHeight, sdl2.WINDOW_RESIZABLE | sdl2.WINDOW_OPENGL)
+	window = sdl2.CreateWindow("AAAAAAAAAAAAAAAAAAA", sdl2.WINDOWPOS_CENTERED, sdl2.WINDOWPOS_CENTERED, screenWidth, screenHeight, sdl2.WINDOW_RESIZABLE | sdl2.WINDOW_OPENGL)
 	if (window == nil) {
 		skeewb.console_log(.ERROR, "could not create a window sdl error: %s", sdl2.GetError())
 		core.quit(-1)
@@ -102,7 +110,7 @@ start :: proc"c"(core: ^skeewb.core_interface) {
         skeewb.console_log(.ERROR, "could not compile shaders\n %s\n %s", a, c)
     }
 
-	chunks = worldRender.setupManyChunks(world.peak(cameraChunkX, cameraChunkZ, viewDistance))
+	chunks = worldRender.setupManyChunks(world.peak(cameraChunkX, 0, cameraChunkZ, viewDistance))
 	
 	gl.GenTextures(1, &texture)
 	gl.BindTexture(gl.TEXTURE_2D, texture)
@@ -137,6 +145,7 @@ cameraPos := glm.vec3{1, 33, 1}
 cameraFront := glm.vec3{0.0, 0.0, -1.0}
 cameraUp := glm.vec3{0.0, 1.0, 0.0}
 cameraRight := math.cross(cameraFront, cameraUp)
+moved := true
 
 yaw: f32 = -90.0;
 pitch: f32 = 0.0;
@@ -244,7 +253,6 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	
 	chunkX := i32(math.floor(cameraPos.x / 32))
 	chunkZ := i32(math.floor(cameraPos.z / 32))
-	moved := false
 
 	if (chunkX != lastChunkX) {
 		cameraChunkX = chunkX
@@ -257,11 +265,13 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 		moved = true
 	}
 	if moved {
-		chunks = worldRender.setupManyChunks(world.peak(cameraChunkX, cameraChunkZ, viewDistance))
+		skeewb.console_log(.INFO, "moved!")
+		chunks = worldRender.setupManyChunks(world.peak(cameraChunkX, 0, cameraChunkZ, viewDistance))
+		moved = false
 	}
 
 	view := glm.mat4LookAt({0, 0, 0}, cameraFront, cameraUp)
-	proj := glm.mat4PerspectiveInfinite(45, f32(screenWidth) / f32(screenHeight), 0.1)
+	proj := glm.mat4Perspective(45, f32(screenWidth) / f32(screenHeight), 0.1, 1000)
 
 	gl.UniformMatrix4fv(uniforms["view"].location, 1, false, &view[0, 0])
 	gl.UniformMatrix4fv(uniforms["projection"].location, 1, false, &proj[0, 0])
@@ -273,10 +283,10 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	gl.BindTexture(gl.TEXTURE_2D, texture);
 
 	for chunk in chunks {
-		pos := [3]f32{f32(chunk.x) * 32 - cameraPos.x, -cameraPos.y, f32(chunk.z) * 32 - cameraPos.z}
+		pos := [3]f32{f32(chunk.x) * 32 - cameraPos.x, - cameraPos.y, f32(chunk.z) * 32 - cameraPos.z}
 		model := math.matrix4_translate_f32(pos)
 		gl.UniformMatrix4fv(uniforms["model"].location, 1, false, &model[0, 0])
-
+	
 		gl.BindVertexArray(chunk.VAO);
 		gl.DrawElements(gl.TRIANGLES, chunk.length, gl.UNSIGNED_INT, nil)
 	}
@@ -287,16 +297,15 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 quit :: proc"c"(core: ^skeewb.core_interface){
 	context = runtime.default_context()
 
+	free(tracking_allocator)
+	mem.tracking_allocator_destroy(tracking_allocator)
+
 	worldRender.nuke()
 	world.nuke()
 
 	delete(uniforms)
 	gl.DeleteProgram(program)
 	gl.DeleteVertexArrays(1, &VAO)
-	for &chunk in chunks {
-		gl.DeleteBuffers(1, &chunk.VBO)
-		gl.DeleteBuffers(1, &chunk.EBO)
-	}
 	delete(chunks)
 
 	sdl2.GL_DeleteContext(gl_context)

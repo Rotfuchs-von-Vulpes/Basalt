@@ -88,7 +88,7 @@ console_log :: proc(category: log_category, format: string, args: ..any, locatio
     }
     fmt.fprint(output_file, prefix)
     fmt.fprintf(output_file, "%02i:%02i:%02i] ", hour, min, second);
-    fmt.fprintf(output_file, "[\033[34m%s | %s:\033[35m%d \033[93m%s()\033[0m] ", "receba", location.file_path, location.line, location.procedure)
+    fmt.fprintf(output_file, "[\033[34m%s | %s:\033[35m%d \033[93m%s()\033[0m] ", "Basalt", location.file_path, location.line, location.procedure)
     fmt.fprintfln(output_file, format, ..args)
 }
 

@@ -2,12 +2,13 @@ package worldRender
 
 import gl "vendor:OpenGL"
 
+import "../skeewb"
 import "../world"
 import "../util"
 import mesh "meshGenerator"
 
 ChunkBuffer :: struct{
-    x, z: i32,
+    x, y, z: i32,
 	VAO, VBO, EBO: u32,
     length: i32
 }
@@ -20,6 +21,8 @@ chunkMap := make(map[iVec3]ChunkBuffer)
 
 setupChunk :: proc(chunk: world.Chunk) -> ChunkBuffer {
     indices, vertices := mesh.generateMesh(chunk)
+    defer delete(indices)
+    defer delete(vertices)
     VAO, VBO, EBO: u32
     
 	gl.GenVertexArrays(1, &VAO)
@@ -42,11 +45,11 @@ setupChunk :: proc(chunk: world.Chunk) -> ChunkBuffer {
 	gl.VertexAttribPointer(2, 2, gl.FLOAT, false, 9 * size_of(f32), 6 * size_of(f32))
 	gl.VertexAttribPointer(3, 1, gl.FLOAT, false, 9 * size_of(f32), 8 * size_of(f32))
 
-    return ChunkBuffer{chunk.x, chunk.z, VAO, VBO, EBO, i32(len(indices))}
+    return ChunkBuffer{chunk.x, chunk.y, chunk.z, VAO, VBO, EBO, i32(len(indices))}
 }
 
 eval :: proc(chunk: world.Chunk) -> ChunkBuffer {
-    pos := iVec3{chunk.x, 0, chunk.z}
+    pos := iVec3{chunk.x, chunk.y, chunk.z}
     chunkBuffer, ok, _ := util.map_force_get(&chunkMap, pos)
     if ok {
         chunkBuffer^ = setupChunk(chunk)
@@ -65,5 +68,9 @@ setupManyChunks :: proc(chunks: [dynamic]world.Chunk) -> [dynamic]ChunkBuffer {
 }
 
 nuke :: proc() {
+	for pos, &chunk in chunkMap {
+		gl.DeleteBuffers(1, &chunk.VBO)
+		gl.DeleteBuffers(1, &chunk.EBO)
+	}
     delete(chunkMap)
 }
