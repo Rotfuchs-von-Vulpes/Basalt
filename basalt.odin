@@ -18,7 +18,7 @@ vert_raw :: #load("assets/shaders/test_vert.glsl")
 frag_raw :: #load("assets/shaders/test_frag.glsl")
 
 @(export)
-load :: proc "c" (core: ^skeewb.core_interface) -> skeewb.module_desc {
+load :: proc"c"(core: ^skeewb.core_interface) -> skeewb.module_desc {
 	context = runtime.default_context()
 
 	core.event_listen("start", skeewb.event_callback(start));
@@ -53,7 +53,7 @@ lastFrame: f32 = 0.0
 
 tracking_allocator: ^mem.Tracking_Allocator
 
-start :: proc "c" (core: ^skeewb.core_interface) {
+start :: proc"c"(core: ^skeewb.core_interface) {
 	context = runtime.default_context()
 
 	tracking_allocator = new(mem.Tracking_Allocator)
@@ -154,7 +154,7 @@ pitch: f32 = 0.0;
 lastChunkX := cameraChunkX
 lastChunkZ := cameraChunkZ
 
-loop :: proc "c" (core: ^skeewb.core_interface) {
+loop :: proc"c"(core: ^skeewb.core_interface) {
 	context = runtime.default_context()
 	context.allocator = mem.tracking_allocator(tracking_allocator)
 	
@@ -304,7 +304,7 @@ loop :: proc "c" (core: ^skeewb.core_interface) {
 	sdl2.GL_SwapWindow(window)
 }
 
-quit :: proc "c" (core: ^skeewb.core_interface){
+quit :: proc"c"(core: ^skeewb.core_interface){
 	context = runtime.default_context()
 	prev_allocator := context.allocator
 	context.allocator = mem.tracking_allocator(tracking_allocator)

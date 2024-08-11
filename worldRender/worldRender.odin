@@ -19,7 +19,7 @@ iVec3 :: struct {
 
 chunkMap := make(map[iVec3]ChunkBuffer)
 
-setupChunk :: proc (chunk: world.Chunk) -> ChunkBuffer {
+setupChunk :: proc(chunk: world.Chunk) -> ChunkBuffer {
     indices, vertices := mesh.generateMesh(chunk)
     defer delete(indices)
     defer delete(vertices)
@@ -48,7 +48,7 @@ setupChunk :: proc (chunk: world.Chunk) -> ChunkBuffer {
     return ChunkBuffer{chunk.x, chunk.y, chunk.z, VAO, VBO, EBO, i32(len(indices))}
 }
 
-eval :: proc (chunk: world.Chunk) -> ChunkBuffer {
+eval :: proc(chunk: world.Chunk) -> ChunkBuffer {
     pos := iVec3{chunk.x, chunk.y, chunk.z}
     chunkBuffer, ok, _ := util.map_force_get(&chunkMap, pos)
     if ok {
@@ -57,7 +57,7 @@ eval :: proc (chunk: world.Chunk) -> ChunkBuffer {
     return chunkBuffer^
 }
 
-setupManyChunks :: proc (chunks: [dynamic]world.Chunk) -> [dynamic]ChunkBuffer {
+setupManyChunks :: proc(chunks: [dynamic]world.Chunk) -> [dynamic]ChunkBuffer {
     chunksBuffers: [dynamic]ChunkBuffer
 
     for chunk in chunks {
@@ -67,7 +67,7 @@ setupManyChunks :: proc (chunks: [dynamic]world.Chunk) -> [dynamic]ChunkBuffer {
     return chunksBuffers;
 }
 
-nuke :: proc () {
+nuke :: proc() {
 	for pos, &chunk in chunkMap {
 		gl.DeleteBuffers(1, &chunk.VBO)
 		gl.DeleteBuffers(1, &chunk.EBO)

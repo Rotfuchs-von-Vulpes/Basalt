@@ -2,7 +2,7 @@ package util
 
 import "base:runtime"
 
-map_force_get :: proc (m: ^$T/map[$K]$V, key: K) -> (value: ^V, just_inserted: bool, err: runtime.Allocator_Error) {
+map_force_get :: proc(m: ^$T/map[$K]$V, key: K) -> (value: ^V, just_inserted: bool, err: runtime.Allocator_Error) {
     key := key
 
     raw  := (^runtime.Raw_Map)(m)

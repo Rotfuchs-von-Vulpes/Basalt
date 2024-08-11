@@ -16,7 +16,7 @@ Chunk :: struct {
 
 chunkMap := make(map[iVec3]Chunk)
 
-// getNoised :: proc (a, b: i32, c, d: int) -> int {
+// getNoised :: proc(a, b: i32, c, d: int) -> int {
 //     posX := f64(a)
 //     posZ := f64(b)
 //     x := f64(c)
@@ -32,7 +32,7 @@ Noise :: struct {
     scale: f64,
 }
 
-pow :: proc (n: f32, exp: int) -> f32 {
+pow :: proc(n: f32, exp: int) -> f32 {
     tmp := n
     for i in 1..<exp {tmp *= n}
     return tmp
@@ -43,19 +43,19 @@ continentalness := Noise{seed, 8, 2.25, 0.5, 0.05}
 erosion := Noise{seed + 1, 4, 2, 0.375, 0.25}
 peaksAndValleys := Noise{seed + 2, 12, 2, 0.75, 0.375}
 
-peake :: proc (n: f32) -> f32 {
+peake :: proc(n: f32) -> f32 {
     return n * n * 0.25
 }
 
-erode :: proc (n: f32) -> f32 {
+erode :: proc(n: f32) -> f32 {
     return math.clamp(n, 0, 1)
 }
 
-mix :: proc (continent, eroding, peaking: f32) -> f32 {
+mix :: proc(continent, eroding, peaking: f32) -> f32 {
     return continent < 0.5 ? continent : continent + erode(eroding) * peake(peaking);
 }
 
-getNoised :: proc (n: Noise, x, z: f64) -> f32 {
+getNoised :: proc(n: Noise, x, z: f64) -> f32 {
     noised: f32 = 0
 
     for i in 0..<n.octaves {
@@ -65,7 +65,7 @@ getNoised :: proc (n: Noise, x, z: f64) -> f32 {
     return 0.5 * noised + 0.5
 }
 
-getTerrain :: proc (x, z: i32, i, j: int) -> int {
+getTerrain :: proc(x, z: i32, i, j: int) -> int {
     posX := f64(x) + f64(i) / 32
     posZ := f64(z) + f64(j) / 32
     continent := getNoised(continentalness, posX, posZ)
@@ -76,7 +76,7 @@ getTerrain :: proc (x, z: i32, i, j: int) -> int {
     return int(31 * earlyTerrain)
 }
 
-getNewChunk :: proc (x, y, z: i32) -> Chunk {
+getNewChunk :: proc(x, y, z: i32) -> Chunk {
     primer := Primer{0..<(32 * 32 * 32) = 0}
 
     for i in 0..<32 {
@@ -91,7 +91,7 @@ getNewChunk :: proc (x, y, z: i32) -> Chunk {
     return Chunk{x, y, z, primer}
 }
 
-eval :: proc (x, y, z: i32) -> Chunk {
+eval :: proc(x, y, z: i32) -> Chunk {
     pos := iVec3{x, y, z}
     chunk, ok, _ := util.map_force_get(&chunkMap, pos)
     if ok {
@@ -100,7 +100,7 @@ eval :: proc (x, y, z: i32) -> Chunk {
     return chunk^
 }
 
-peak :: proc (x, y, z: i32, radius: i32) -> [dynamic]Chunk {
+peak :: proc(x, y, z: i32, radius: i32) -> [dynamic]Chunk {
     chunksToView := [dynamic]Chunk{}
     radiusP := radius + 1
 
@@ -116,6 +116,6 @@ peak :: proc (x, y, z: i32, radius: i32) -> [dynamic]Chunk {
     return chunksToView
 }
 
-nuke :: proc () {
+nuke :: proc() {
     delete(chunkMap)
 }
