@@ -1,6 +1,10 @@
 package worldRender
 
 import gl "vendor:OpenGL"
+import "vendor:sdl2"
+import stb "vendor:stb/image"
+import glm "core:math/linalg/glsl"
+import math "core:math/linalg"
 
 import "../skeewb"
 import "../world"
@@ -65,6 +69,78 @@ setupManyChunks :: proc(chunks: [dynamic]world.Chunk) -> [dynamic]ChunkBuffer {
     }
 
     return chunksBuffers;
+}
+
+Camera :: struct{
+	pos: glm.vec3,
+	front: glm.vec3,
+	up: glm.vec3,
+	right: glm.vec3,
+	chunk: [3]i32,
+	viewDistance: i32,
+    viewPort: glm.vec2,
+}
+
+Render :: struct{
+	uniforms: map[string]gl.Uniform_Info,
+	program: u32,
+	texture: u32,
+}
+
+setupDrawing :: proc(core: ^skeewb.core_interface, render: ^Render) {
+	vertShader := core.resource_load("vert", "basalt/assets/shaders/test_vert.glsl")
+	fragShader := core.resource_load("frag", "basalt/assets/shaders/test_frag.glsl")
+
+	shaderSuccess : bool
+	render.program, shaderSuccess = gl.load_shaders_source(core.resource_string(vertShader), core.resource_string(fragShader))
+
+    if !shaderSuccess {
+        len: i32
+        info: [^]u8
+        gl.GetShaderInfoLog(render.program, 1024, nil, info)
+        a, b, c, d := gl.get_last_error_messages()
+        skeewb.console_log(.ERROR, "could not compile shaders\n %s\n %s", a, c)
+    }
+
+	gl.GenTextures(1, &render.texture)
+	gl.BindTexture(gl.TEXTURE_2D, render.texture)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+
+	width, height, channels: i32
+	data := core.resource_string(core.resource_load("madera", "basalt/assets/textures/default_box.png"))
+	pixels := stb.load_from_memory(raw_data(data), cast(i32) len(data), &width, &height, &channels, 4)
+	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
+	gl.GenerateMipmap(gl.TEXTURE_2D)
+	if sdl2.GL_ExtensionSupported("GL_EXT_texture_filter_anisotropic") {
+		filter: f32
+		gl.GetFloatv(gl.MAX_TEXTURE_MAX_ANISOTROPY, &filter)
+		gl.TexParameterf(gl.TEXTURE_2D, gl.TEXTURE_MAX_ANISOTROPY, filter)
+	}
+}
+
+drawChunks :: proc(chunks: [dynamic]ChunkBuffer, camera: Camera, render: Render) {
+	view := glm.mat4LookAt({0, 0, 0}, camera.front, camera.up)
+	proj := glm.mat4PerspectiveInfinite(45, camera.viewPort.x / camera.viewPort.y, 0.1)
+
+	gl.UniformMatrix4fv(render.uniforms["view"].location, 1, false, &view[0, 0])
+	gl.UniformMatrix4fv(render.uniforms["projection"].location, 1, false, &proj[0, 0])
+
+	gl.UseProgram(render.program)
+
+	gl.ActiveTexture(gl.TEXTURE0);
+	gl.BindTexture(gl.TEXTURE_2D, render.texture);
+
+	for chunk in chunks {
+		pos := [3]f32{f32(chunk.x) * 32 - camera.pos.x, f32(chunk.y) * 32 - camera.pos.y, f32(chunk.z) * 32 - camera.pos.z}
+		model := math.matrix4_translate_f32(pos)
+		gl.UniformMatrix4fv(render.uniforms["model"].location, 1, false, &model[0, 0])
+
+		gl.BindVertexArray(chunk.VAO);
+		gl.DrawElements(gl.TRIANGLES, chunk.length, gl.UNSIGNED_INT, nil)
+	}
 }
 
 nuke :: proc() {

@@ -85,6 +85,7 @@ isSideExposed :: proc(primer: world.Primer, primers: Primers, pos: BlockPos, off
     }
 
     sidePos = BlockPos{u8(i8(sidePos.x) + x), u8(i8(sidePos.y) + y), u8(i8(sidePos.z) + z)}
+    if primers[(chunkXOffset + 1) * 3 + chunkZOffset + 1] == nil {return true}
     return primers[(chunkXOffset + 1) * 3 + chunkZOffset + 1].primer[toIndex(sidePos)] == 0;
 }
 
@@ -268,13 +269,15 @@ makeVertices :: proc(faces: [dynamic]Face, primer: world.Primer, primers: Primer
 generateMesh :: proc(chunk: world.Chunk) -> ([dynamic]u32, [dynamic]f32) {
     primer := chunk.primer
     x := chunk.x
+    y := chunk.y
     z := chunk.z
     
     primers: Primers
 
     for i: i32 = 0; i < 3; i += 1 {
         for j: i32 = 0; j < 3; j += 1 {
-            primers[i * 3 + j] = &world.chunkMap[{x + i - 1, 0, z + j - 1}]
+            pos := [3]i32{x + i - 1, y, z + j - 1}
+            primers[i * 3 + j] = pos in world.chunkMap ? &world.chunkMap[pos] : nil
         }
     }
 

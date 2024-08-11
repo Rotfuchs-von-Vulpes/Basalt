@@ -9,7 +9,6 @@ import "skeewb"
 import "base:runtime"
 import "vendor:sdl2"
 import gl "vendor:OpenGL"
-import stb "vendor:stb/image"
 
 import "world"
 import "worldRender"
@@ -36,18 +35,15 @@ start_tick: time.Tick
 
 window: ^sdl2.Window
 gl_context: sdl2.GLContext
-program: u32
-VAO: u32
-texture: u32
-uniforms: map[string]gl.Uniform_Info
-
-chunks: [dynamic]worldRender.ChunkBuffer = {}
-cameraChunkX: i32 = 0
-cameraChunkZ: i32 = 0
-viewDistance: i32 = 6
-
 screenWidth: i32 = 854
 screenHeight: i32 = 480
+
+playerCamera := worldRender.Camera{{1, 33, 1}, {0, 0, -1}, {0, 1, 0}, {1, 0, 0}, {0, 0, 0}, 6, {f32(screenWidth), f32(screenHeight)}}
+
+mainRender := worldRender.Render{{}, 0, 0}
+
+chunks: [dynamic]worldRender.ChunkBuffer = {}
+
 deltaTime: f32 = 0.0
 lastFrame: f32 = 0.0
 
@@ -95,46 +91,17 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	// gl.Enable(gl.BLEND)
 	// gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
-	vertShader := core.resource_load("vert", "basalt/assets/shaders/test_vert.glsl")
-	fragShader := core.resource_load("frag", "basalt/assets/shaders/test_frag.glsl")
+	worldRender.setupDrawing(core, &mainRender)
 
-	shaderSuccess : bool
-	program, shaderSuccess = gl.load_shaders_source(core.resource_string(vertShader), core.resource_string(fragShader))
-
-    if !shaderSuccess {
-        len: i32
-        info: [^]u8
-        gl.GetShaderInfoLog(program, 1024, nil, info)
-        a, b, c, d := gl.get_last_error_messages()
-        skeewb.console_log(.ERROR, "could not compile shaders\n %s\n %s", a, c)
-    }
-
-	tmp := world.peak(cameraChunkX, 0, cameraChunkZ, viewDistance)
+	tmp := world.peak(playerCamera.chunk.x, playerCamera.chunk.y, playerCamera.chunk.z, playerCamera.viewDistance)
 	defer delete(tmp)
 	chunks = worldRender.setupManyChunks(tmp)
-	
-	gl.GenTextures(1, &texture)
-	gl.BindTexture(gl.TEXTURE_2D, texture)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
-	width, height, channels: i32
-	data := core.resource_string(core.resource_load("madera", "basalt/assets/textures/default_box.png"))
-	pixels := stb.load_from_memory(raw_data(data), cast(i32) len(data), &width, &height, &channels, 4)
-	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
-	gl.GenerateMipmap(gl.TEXTURE_2D)
-	if sdl2.GL_ExtensionSupported("GL_EXT_texture_filter_anisotropic") {
-		filter: f32
-		gl.GetFloatv(gl.MAX_TEXTURE_MAX_ANISOTROPY, &filter)
-		gl.TexParameterf(gl.TEXTURE_2D, gl.TEXTURE_MAX_ANISOTROPY, filter)
-	}
 
 	gl.ClearColor(0.1, 0.1, 0.1, 1.0)
     
-	gl.UseProgram(program)
+	gl.UseProgram(mainRender.program)
 
-	uniforms = gl.get_uniforms_from_program(program)
+	mainRender.uniforms = gl.get_uniforms_from_program(mainRender.program)
 }
 
 toFront := false
@@ -142,17 +109,14 @@ toBehind := false
 toRight := false
 toLeft := false
 
-cameraPos := glm.vec3{1, 31, 1}
-cameraFront := glm.vec3{0.0, 0.0, -1.0}
-cameraUp := glm.vec3{0.0, 1.0, 0.0}
-cameraRight := math.cross(cameraFront, cameraUp)
 moved: bool
 
 yaw: f32 = -90.0;
 pitch: f32 = 0.0;
 
-lastChunkX := cameraChunkX
-lastChunkZ := cameraChunkZ
+lastChunkX := playerCamera.chunk.x
+lastChunkY := playerCamera.chunk.y
+lastChunkZ := playerCamera.chunk.z
 
 loop :: proc"c"(core: ^skeewb.core_interface) {
 	context = runtime.default_context()
@@ -216,21 +180,21 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 			yawRadians := yaw * math.RAD_PER_DEG
 			pitchRadians := pitch * math.RAD_PER_DEG
 		
-			cameraFront = {
+			playerCamera.front = {
 				math.cos(yawRadians) * math.cos(pitchRadians),
 				math.sin(pitchRadians),
 				math.sin(yawRadians) * math.cos(pitchRadians)
 			}
-			cameraFront = math.vector_normalize(cameraFront)
+			playerCamera.front = math.vector_normalize(playerCamera.front)
 			
-			cameraUp = {
+			playerCamera.up = {
 				-math.sin(pitchRadians) * math.cos(yawRadians),
 				 math.cos(pitchRadians),
 				-math.sin(pitchRadians) * math.sin(yawRadians)
 			}
-			cameraUp = math.vector_normalize(cameraUp)
+			playerCamera.up = math.vector_normalize(playerCamera.up)
 
-			cameraRight = math.cross(cameraFront, cameraUp)
+			playerCamera.right = math.cross(playerCamera.front, playerCamera.up)
 		}
 	}
 
@@ -239,67 +203,56 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 
 	if toFront != toBehind {
 		if toFront {
-			scale += cameraFront
+			scale += playerCamera.front
 		} else {
-			scale -= cameraFront
+			scale -= playerCamera.front
 		}
 	}
 
 	if toLeft != toRight {
 		if toLeft {
-			scale -= cameraRight
+			scale -= playerCamera.right
 		} else {
-			scale += cameraRight
+			scale += playerCamera.right
 		}
 	}
 
 	if math.length(scale) > 0 {scale = math.vector_normalize(scale) * cameraSpeed}
-	cameraPos += scale;
+	playerCamera.pos += scale;
 	
-	chunkX := i32(math.floor(cameraPos.x / 32))
-	chunkZ := i32(math.floor(cameraPos.z / 32))
+	chunkX := i32(math.floor(playerCamera.pos.x / 32))
+	chunkY := i32(math.floor(playerCamera.pos.z / 32))
+	chunkZ := i32(math.floor(playerCamera.pos.z / 32))
 	moved = false
 
-	if (chunkX != lastChunkX) {
-		cameraChunkX = chunkX
+	if chunkX != lastChunkX {
+		playerCamera.chunk.x = chunkX
 		lastChunkX = chunkX
 		moved = true
 	}
-	if (chunkZ != lastChunkZ) {
-		cameraChunkZ = chunkZ
+	if chunkY != lastChunkY {
+		playerCamera.chunk.y = chunkY
+		lastChunkY = chunkY
+		moved = true
+	}
+	if chunkZ != lastChunkZ {
+		playerCamera.chunk.z = chunkZ
 		lastChunkZ = chunkZ
 		moved = true
 	}
+
 	if moved {
-		skeewb.console_log(.INFO, "moved!")
 		if chunks != nil {
 			delete(chunks)
 		}
-		tmp := world.peak(cameraChunkX, 0, cameraChunkZ, viewDistance)
+		tmp := world.peak(playerCamera.chunk.x, playerCamera.chunk.y, playerCamera.chunk.z, playerCamera.viewDistance)
 		defer delete(tmp)
 		chunks = worldRender.setupManyChunks(tmp)
 	}
-
-	view := glm.mat4LookAt({0, 0, 0}, cameraFront, cameraUp)
-	proj := glm.mat4PerspectiveInfinite(45, f32(screenWidth) / f32(screenHeight), 0.1)
-
-	gl.UniformMatrix4fv(uniforms["view"].location, 1, false, &view[0, 0])
-	gl.UniformMatrix4fv(uniforms["projection"].location, 1, false, &proj[0, 0])
-
+	
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-	gl.UseProgram(program)
 
-	gl.ActiveTexture(gl.TEXTURE0);
-	gl.BindTexture(gl.TEXTURE_2D, texture);
-
-	for chunk in chunks {
-		pos := [3]f32{f32(chunk.x) * 32 - cameraPos.x, f32(chunk.y) * 32 - cameraPos.y, f32(chunk.z) * 32 - cameraPos.z}
-		model := math.matrix4_translate_f32(pos)
-		gl.UniformMatrix4fv(uniforms["model"].location, 1, false, &model[0, 0])
-
-		gl.BindVertexArray(chunk.VAO);
-		gl.DrawElements(gl.TRIANGLES, chunk.length, gl.UNSIGNED_INT, nil)
-	}
+	worldRender.drawChunks(chunks, playerCamera, mainRender)
 
 	sdl2.GL_SwapWindow(window)
 }
@@ -316,12 +269,11 @@ quit :: proc"c"(core: ^skeewb.core_interface){
 	worldRender.nuke()
 	world.nuke()
 
-	for key, value in uniforms {
+	for key, value in mainRender.uniforms {
 		delete(value.name)
 	}
-	delete(uniforms)
-	gl.DeleteProgram(program)
-	gl.DeleteVertexArrays(1, &VAO)
+	delete(mainRender.uniforms)
+	gl.DeleteProgram(mainRender.program)
 	for &chunk in chunks {
 		gl.DeleteBuffers(1, &chunk.VBO)
 		gl.DeleteBuffers(1, &chunk.EBO)

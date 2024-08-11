@@ -3,10 +3,15 @@ package world
 import "../skeewb"
 import "core:math/noise"
 import "core:math"
+import "core:fmt"
 import "../util"
 
 Primer :: [32 * 32 * 32]u32
+HeightMap :: [32 * 32]i32
 
+emptyPrimer := Primer{0..<(32 * 32 * 32) = 0}
+
+iVec2 :: [2]i32
 iVec3 :: [3]i32
 
 Chunk :: struct {
@@ -15,6 +20,7 @@ Chunk :: struct {
 }
 
 chunkMap := make(map[iVec3]Chunk)
+terrainMap := make(map[iVec2]HeightMap)
 
 // getNoised :: proc(a, b: i32, c, d: int) -> int {
 //     posX := f64(a)
@@ -39,7 +45,7 @@ pow :: proc(n: f32, exp: int) -> f32 {
 }
 
 seed: i64 = 1;
-continentalness := Noise{seed, 8, 2.25, 0.5, 0.05}
+continentalness := Noise{seed, 8, 2.25, 0.5, 0.01}
 erosion := Noise{seed + 1, 4, 2, 0.375, 0.25}
 peaksAndValleys := Noise{seed + 2, 12, 2, 0.75, 0.375}
 
@@ -65,7 +71,7 @@ getNoised :: proc(n: Noise, x, z: f64) -> f32 {
     return 0.5 * noised + 0.5
 }
 
-getTerrain :: proc(x, z: i32, i, j: int) -> int {
+getTerrain :: proc(x, z: i32, i, j: int) -> i32 {
     posX := f64(x) + f64(i) / 32
     posZ := f64(z) + f64(j) / 32
     continent := getNoised(continentalness, posX, posZ)
@@ -73,15 +79,15 @@ getTerrain :: proc(x, z: i32, i, j: int) -> int {
     peaking := getNoised(peaksAndValleys, posX, posZ)
     earlyTerrain := mix(continent, eroding, peaking)
 
-    return int(31 * earlyTerrain)
+    return i32(31 * earlyTerrain)
 }
 
-getNewChunk :: proc(x, y, z: i32) -> Chunk {
+getNewChunk :: proc(x, y, z: i32, heightMap: HeightMap) -> Chunk {
     primer := Primer{0..<(32 * 32 * 32) = 0}
-
+    
     for i in 0..<32 {
         for j in 0..<32 {
-            height := math.clamp(getTerrain(x, z, i, j), 0, 31)
+            height := int(heightMap[i * 32 + j])
             for k in 0..<height {
                 primer[i * 32 * 32 + j * 32 + k] = 1
             }
@@ -91,11 +97,50 @@ getNewChunk :: proc(x, y, z: i32) -> Chunk {
     return Chunk{x, y, z, primer}
 }
 
-eval :: proc(x, y, z: i32) -> Chunk {
+getHeightMap :: proc(x, z: i32) -> HeightMap {
+    heightMap: HeightMap = {}
+
+    for i in 0..<32 {
+        for j in 0..<32 {
+            height := getTerrain(x, z, i, j)
+            heightMap[i * 32 + j] = height
+        }
+    }
+
+    return heightMap
+}
+
+chopp :: proc(heightMap: ^HeightMap) -> [dynamic]HeightMap {
+    heightsMaps: [dynamic]HeightMap = {HeightMap{0..<(32 * 32) = 0}}
+
+    for height, idx in heightMap {
+        tmp := height
+        if tmp > 31 {
+            if len(heightsMaps) == 1 {append(&heightsMaps, HeightMap{0..<(32 * 32) = 0})}
+            heightsMaps[0][idx] = 32
+            heightsMaps[1][idx] = tmp - 32
+        } else {
+            heightsMaps[0][idx] = tmp
+        }
+    }
+
+    return heightsMaps
+}
+
+evalTerrain :: proc(x, z: i32) -> [dynamic]HeightMap {
+    pos := iVec2{x, z}
+    terrain, ok, _ := util.map_force_get(&terrainMap, pos)
+    if ok {
+        terrain^ = getHeightMap(x, z)
+    }
+    return chopp(terrain)
+}
+
+eval :: proc(x, y, z: i32, terrain: HeightMap) -> Chunk {
     pos := iVec3{x, y, z}
     chunk, ok, _ := util.map_force_get(&chunkMap, pos)
     if ok {
-        chunk^ = getNewChunk(x, y, z)
+        chunk^ = getNewChunk(x, y, z, terrain)
     }
     return chunk^
 }
@@ -106,10 +151,12 @@ peak :: proc(x, y, z: i32, radius: i32) -> [dynamic]Chunk {
 
     for i := -radiusP; i <= radiusP; i += 1 {
         for j := -radiusP; j <= radiusP; j += 1 {
-            //for k := -radiusP; k <= radiusP; k += 1 {
-                chunk := eval(x + i, 0, z + j);
+            terrains := evalTerrain(x + i, z + j)
+            defer delete(terrains)
+            for terrain, height in terrains {
+                chunk := eval(x + i, i32(height), z + j, terrain);
                 if (i != -radiusP && i != radiusP) && (j != -radiusP && j != radiusP) {append(&chunksToView, chunk)}
-            //}
+            }
         }
     }
 
