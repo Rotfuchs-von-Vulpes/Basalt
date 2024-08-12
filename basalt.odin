@@ -53,9 +53,6 @@ mainRender := worldRender.Render{{}, 0, 0}
 chunks: [dynamic]worldRender.ChunkBuffer
 allChunks: [dynamic]worldRender.ChunkBuffer
 
-deltaTime: f32 = 0.0
-lastFrame: f32 = 0.0
-
 tracking_allocator: ^mem.Tracking_Allocator
 
 start :: proc"c"(core: ^skeewb.core_interface) {
@@ -217,7 +214,7 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	}
 
 	cameraSpeed: f32 = 0.125
-	scale: glm.vec3 = {0, 0, 0}
+	scale: [3]f32 = {0, 0, 0}
 
 	if toFront != toBehind {
 		if toFront {
@@ -235,7 +232,7 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 		}
 	}
 
-	if math.length(scale) > 0 {
+	if scale.x != 0 || scale.y != 0 || scale.z != 0 {
 		scale = math.vector_normalize(scale) * cameraSpeed
 		playerCamera.pos += scale;
 		if chunks != nil {delete(chunks)}
@@ -243,7 +240,7 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	}
 	
 	chunkX := i32(math.floor(playerCamera.pos.x / 32))
-	chunkY := i32(math.floor(playerCamera.pos.z / 32))
+	chunkY := i32(math.floor(playerCamera.pos.y / 32))
 	chunkZ := i32(math.floor(playerCamera.pos.z / 32))
 	moved = false
 

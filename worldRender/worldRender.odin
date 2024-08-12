@@ -21,10 +21,10 @@ iVec3 :: struct {
     x, y, z: i32
 }
 
-mat4 :: glm.mat4
-vec2 :: glm.vec2
-vec3 :: glm.vec3
-vec4 :: glm.vec4
+mat4 :: glm.mat4x4
+vec2 :: [2]f32
+vec3 :: [3]f32
+vec4 :: [4]f32
 
 chunkMap := make(map[iVec3]ChunkBuffer)
 
@@ -128,16 +128,16 @@ setupDrawing :: proc(core: ^skeewb.core_interface, render: ^Render) {
 }
 
 cameraSetup :: proc(camera: ^Camera, render: Render) {
-	camera.proj = glm.mat4PerspectiveInfinite(45, camera.viewPort.x / camera.viewPort.y, 0.1)
+	camera.proj = math.matrix4_infinite_perspective_f32(45, camera.viewPort.x / camera.viewPort.y, 0.1)
 	gl.UniformMatrix4fv(render.uniforms["projection"].location, 1, false, &camera.proj[0, 0])
 }
 
 cameraMove :: proc(camera: ^Camera, render: Render) {
-	camera.view = glm.mat4LookAt({0, 0, 0}, camera.front, camera.up)
+	camera.view = math.matrix4_look_at_f32({0, 0, 0}, camera.front, camera.up)
 	gl.UniformMatrix4fv(render.uniforms["view"].location, 1, false, &camera.view[0, 0])
 }
 
-testAabb :: proc(MPV: mat4, min, max: [3]f32) -> bool
+testAabb :: proc(MPV: mat4, min, max: vec3) -> bool
 {
 	nxX := MPV[0][3] + MPV[0][0]; nxY := MPV[1][3] + MPV[1][0]; nxZ := MPV[2][3] + MPV[2][0]; nxW := MPV[3][3] + MPV[3][0]
 	pxX := MPV[0][3] - MPV[0][0]; pxY := MPV[1][3] - MPV[1][0]; pxZ := MPV[2][3] - MPV[2][0]; pxW := MPV[3][3] - MPV[3][0]
@@ -159,8 +159,8 @@ frustumCulling :: proc(chunks: [dynamic]ChunkBuffer, camera: ^Camera) -> [dynami
 
 	PV := camera.proj * camera.view
 	for chunk in chunks {
-		minC := [3]f32{f32(chunk.x) * 32 - camera.pos.x, f32(chunk.y) * 32 - camera.pos.y, f32(chunk.z) * 32 - camera.pos.z}
-		maxC := minC + [3]f32{32, 32, 32}
+		minC := 32 * vec3{f32(chunk.x), f32(chunk.y), f32(chunk.z)} - camera.pos
+		maxC := minC + vec3{32, 32, 32}
 		
 		if testAabb(PV, minC, maxC) {append(&chunksBuffers, chunk)}
 	}
@@ -173,7 +173,7 @@ drawChunks :: proc(chunks: [dynamic]ChunkBuffer, camera: Camera, render: Render)
 	gl.BindTexture(gl.TEXTURE_2D, render.texture);
 
 	for chunk in chunks {
-		pos := [3]f32{f32(chunk.x) * 32 - camera.pos.x, f32(chunk.y) * 32 - camera.pos.y, f32(chunk.z) * 32 - camera.pos.z}
+		pos := vec3{f32(chunk.x) * 32 - camera.pos.x, f32(chunk.y) * 32 - camera.pos.y, f32(chunk.z) * 32 - camera.pos.z}
 		model := math.matrix4_translate_f32(pos)
 		gl.UniformMatrix4fv(render.uniforms["model"].location, 1, false, &model[0, 0])
 
