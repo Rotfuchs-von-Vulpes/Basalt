@@ -3,7 +3,7 @@ package meshGenerator
 import "../../skeewb"
 import "../../world"
 
-Primers :: [3 * 3]^world.Chunk
+Primers :: [3 * 3 * 3]^world.Chunk
 
 Pos :: struct {
     x, y, z: i8
@@ -55,6 +55,7 @@ isSideExposed :: proc(primer: world.Primer, primers: Primers, pos: BlockPos, off
     sidePos := pos
 
     chunkXOffset := 0
+    chunkYOffset := 0
     chunkZOffset := 0
 
     if offset.x < 0 && pos.x == 0 {
@@ -68,10 +69,14 @@ isSideExposed :: proc(primer: world.Primer, primers: Primers, pos: BlockPos, off
         chunkXOffset = 1
     }
     if offset.y < 0 && pos.y == 0 {
-        return true
+        sidePos = BlockPos{sidePos.x, 31, sidePos.z}
+        y = 0
+        chunkYOffset = -1
     }
     if offset.y > 0 && pos.y == 31 {
-        return true
+        sidePos = BlockPos{sidePos.x, 0, sidePos.z}
+        y = 0
+        chunkYOffset = 1
     }
     if offset.z < 0 && pos.z == 0 {
         z = 0
@@ -85,8 +90,9 @@ isSideExposed :: proc(primer: world.Primer, primers: Primers, pos: BlockPos, off
     }
 
     sidePos = BlockPos{u8(i8(sidePos.x) + x), u8(i8(sidePos.y) + y), u8(i8(sidePos.z) + z)}
-    if primers[(chunkXOffset + 1) * 3 + chunkZOffset + 1] == nil {return true}
-    return primers[(chunkXOffset + 1) * 3 + chunkZOffset + 1].primer[toIndex(sidePos)] == 0;
+    idx := (chunkYOffset + 1) * 3 * 3 + (chunkXOffset + 1) * 3 + chunkZOffset + 1
+    if primers[idx] == nil {return true}
+    return primers[idx].primer[toIndex(sidePos)] == 0;
 }
 
 hasSideExposed :: proc(primer: world.Primer, primers: Primers, pos: BlockPos) -> bool {
@@ -276,8 +282,10 @@ generateMesh :: proc(chunk: world.Chunk) -> ([dynamic]u32, [dynamic]f32) {
 
     for i: i32 = 0; i < 3; i += 1 {
         for j: i32 = 0; j < 3; j += 1 {
-            pos := [3]i32{x + i - 1, y, z + j - 1}
-            primers[i * 3 + j] = pos in world.chunkMap ? &world.chunkMap[pos] : nil
+            for k: i32 = 0; k < 3; k += 1 {
+                pos := [3]i32{x + i - 1, y + k - 1, z + j - 1}
+                primers[k * 3 * 3 + i * 3 + j] = &world.chunkMap[pos]
+            }
         }
     }
 
