@@ -21,6 +21,11 @@ iVec3 :: struct {
     x, y, z: i32
 }
 
+mat4 :: glm.mat4
+vec2 :: glm.vec2
+vec3 :: glm.vec3
+vec4 :: glm.vec4
+
 chunkMap := make(map[iVec3]ChunkBuffer)
 
 setupChunk :: proc(chunk: world.Chunk) -> ChunkBuffer {
@@ -72,13 +77,14 @@ setupManyChunks :: proc(chunks: [dynamic]world.Chunk) -> [dynamic]ChunkBuffer {
 }
 
 Camera :: struct{
-	pos: glm.vec3,
-	front: glm.vec3,
-	up: glm.vec3,
-	right: glm.vec3,
+	pos: vec3,
+	front: vec3,
+	up: vec3,
+	right: vec3,
 	chunk: [3]i32,
 	viewDistance: i32,
-    viewPort: glm.vec2,
+    viewPort: vec2,
+	proj, view: mat4
 }
 
 Render :: struct{
@@ -121,15 +127,60 @@ setupDrawing :: proc(core: ^skeewb.core_interface, render: ^Render) {
 	}
 }
 
+cameraSetup :: proc(camera: ^Camera, render: Render) {
+	camera.proj = glm.mat4PerspectiveInfinite(45, camera.viewPort.x / camera.viewPort.y, 0.1)
+	gl.UniformMatrix4fv(render.uniforms["projection"].location, 1, false, &camera.proj[0, 0])
+}
+
+cameraMove :: proc(camera: ^Camera, render: Render) {
+	camera.view = glm.mat4LookAt({0, 0, 0}, camera.front, camera.up)
+	gl.UniformMatrix4fv(render.uniforms["view"].location, 1, false, &camera.view[0, 0])
+}
+
+frustumCulling :: proc(chunks: [dynamic]ChunkBuffer, camera: ^Camera) -> [dynamic]ChunkBuffer {
+	chunksBuffers: [dynamic]ChunkBuffer
+
+	PV := camera.proj * camera.view
+	for chunk in chunks {
+		minC := [3]f32{f32(chunk.x) * 32 - camera.pos.x, f32(chunk.y) * 32 - camera.pos.y, f32(chunk.z) * 32 - camera.pos.z}
+		maxC := minC + [3]f32{32, 32, 32}
+		
+		corners := [?][3]f32{
+			{minC.x, minC.y, minC.z},
+			{minC.x, minC.y, maxC.z},
+			{minC.x, maxC.y, minC.z},
+			{minC.x, maxC.y, maxC.z},
+			{maxC.x, minC.y, minC.z},
+			{maxC.x, minC.y, maxC.z},
+			{maxC.x, maxC.y, minC.z},
+			{maxC.x, maxC.y, maxC.z},
+		}
+
+		minor, major: [3]f32 = {2, 2, 2}, {-2, -2, -2}
+		for corner in corners {
+			MPV := PV * vec4{corner.x, corner.y, corner.z, 1}
+
+			x := MPV.x / MPV.w
+			y := MPV.y / MPV.w
+			z := MPV.z / MPV.w
+			minor.x = min(minor.x, x)
+			minor.y = min(minor.y, y)
+			minor.z = min(minor.z, z)
+			major.x = max(major.x, x)
+			major.y = max(major.y, y)
+			major.z = max(major.z, z)
+
+			if major.x > -1 || minor.x < 1 && major.y > -1 || minor.y < 1 && major.z > -1 || minor.z < 1 {
+				append(&chunksBuffers, chunk)
+				break
+			}
+		}
+	}
+
+	return chunksBuffers
+}
+
 drawChunks :: proc(chunks: [dynamic]ChunkBuffer, camera: Camera, render: Render) {
-	view := glm.mat4LookAt({0, 0, 0}, camera.front, camera.up)
-	proj := glm.mat4PerspectiveInfinite(45, camera.viewPort.x / camera.viewPort.y, 0.1)
-
-	gl.UniformMatrix4fv(render.uniforms["view"].location, 1, false, &view[0, 0])
-	gl.UniformMatrix4fv(render.uniforms["projection"].location, 1, false, &proj[0, 0])
-
-	gl.UseProgram(render.program)
-
 	gl.ActiveTexture(gl.TEXTURE0);
 	gl.BindTexture(gl.TEXTURE_2D, render.texture);
 

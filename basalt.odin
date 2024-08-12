@@ -38,11 +38,20 @@ gl_context: sdl2.GLContext
 screenWidth: i32 = 854
 screenHeight: i32 = 480
 
-playerCamera := worldRender.Camera{{1, 33, 1}, {0, 0, -1}, {0, 1, 0}, {1, 0, 0}, {0, 0, 0}, 6, {f32(screenWidth), f32(screenHeight)}}
+playerCamera := worldRender.Camera{
+	{1, 33, 1}, 
+	{0, 0, -1}, 
+	{0, 1, 0}, 
+	{1, 0, 0}, 
+	{0, 0, 0}, 6, 
+	{f32(screenWidth), f32(screenHeight)}, 
+	math.MATRIX4F32_IDENTITY, math.MATRIX4F32_IDENTITY
+}
 
 mainRender := worldRender.Render{{}, 0, 0}
 
-chunks: [dynamic]worldRender.ChunkBuffer = {}
+chunks: [dynamic]worldRender.ChunkBuffer
+allChunks: [dynamic]worldRender.ChunkBuffer
 
 deltaTime: f32 = 0.0
 lastFrame: f32 = 0.0
@@ -87,7 +96,7 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	
 	gl.Enable(gl.DEPTH_TEST)
 	gl.Enable(gl.CULL_FACE)
-	// gl.CullFace(gl.BACK)
+	gl.CullFace(gl.BACK)
 	// gl.Enable(gl.BLEND)
 	// gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
@@ -95,13 +104,18 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 
 	tmp := world.peak(playerCamera.chunk.x, playerCamera.chunk.y, playerCamera.chunk.z, playerCamera.viewDistance)
 	defer delete(tmp)
-	chunks = worldRender.setupManyChunks(tmp)
+	allChunks = worldRender.setupManyChunks(tmp)
 
 	gl.ClearColor(0.1, 0.1, 0.1, 1.0)
     
 	gl.UseProgram(mainRender.program)
 
 	mainRender.uniforms = gl.get_uniforms_from_program(mainRender.program)
+
+	worldRender.cameraSetup(&playerCamera, mainRender)
+	worldRender.cameraMove(&playerCamera, mainRender)
+
+	chunks = worldRender.frustumCulling(allChunks, &playerCamera)
 }
 
 toFront := false
@@ -195,6 +209,10 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 			playerCamera.up = math.vector_normalize(playerCamera.up)
 
 			playerCamera.right = math.cross(playerCamera.front, playerCamera.up)
+			
+			worldRender.cameraMove(&playerCamera, mainRender)
+			if chunks != nil {delete(chunks)}
+			chunks = worldRender.frustumCulling(allChunks, &playerCamera)
 		}
 	}
 
@@ -217,8 +235,12 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 		}
 	}
 
-	if math.length(scale) > 0 {scale = math.vector_normalize(scale) * cameraSpeed}
-	playerCamera.pos += scale;
+	if math.length(scale) > 0 {
+		scale = math.vector_normalize(scale) * cameraSpeed
+		playerCamera.pos += scale;
+		if chunks != nil {delete(chunks)}
+		chunks = worldRender.frustumCulling(allChunks, &playerCamera)
+	}
 	
 	chunkX := i32(math.floor(playerCamera.pos.x / 32))
 	chunkY := i32(math.floor(playerCamera.pos.z / 32))
@@ -242,12 +264,12 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	}
 
 	if moved {
-		if chunks != nil {
-			delete(chunks)
-		}
+		if allChunks != nil {delete(allChunks)}
+		if chunks != nil {delete(chunks)}
 		tmp := world.peak(playerCamera.chunk.x, playerCamera.chunk.y, playerCamera.chunk.z, playerCamera.viewDistance)
 		defer delete(tmp)
-		chunks = worldRender.setupManyChunks(tmp)
+		allChunks = worldRender.setupManyChunks(tmp)
+		chunks = worldRender.frustumCulling(allChunks, &playerCamera)
 	}
 	
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
@@ -278,6 +300,7 @@ quit :: proc"c"(core: ^skeewb.core_interface){
 		gl.DeleteBuffers(1, &chunk.VBO)
 		gl.DeleteBuffers(1, &chunk.EBO)
 	}
+	delete(allChunks)
 	delete(chunks)
 	
 	sdl2.GL_DeleteContext(gl_context)
