@@ -116,9 +116,14 @@ chopp :: proc(heightMap: ^HeightMap) -> [dynamic]HeightMap {
     for height, idx in heightMap {
         tmp := height
         if tmp > 31 {
-            if len(heightsMaps) == 1 {append(&heightsMaps, HeightMap{0..<(32 * 32) = 0})}
-            heightsMaps[0][idx] = 32
-            heightsMaps[1][idx] = tmp - 32
+            i := 0
+            for tmp > 31 {
+                if len(heightsMaps) == i + 1 {append(&heightsMaps, HeightMap{0..<(32 * 32) = 0})}
+                heightsMaps[i][idx] = 32
+                tmp = tmp - 32
+                i += 1
+            }
+            heightsMaps[i][idx] = tmp
         } else {
             heightsMaps[0][idx] = tmp
         }
