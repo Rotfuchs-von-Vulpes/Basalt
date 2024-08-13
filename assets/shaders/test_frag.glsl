@@ -5,11 +5,11 @@ in vec3 Normal;
 in vec2 TexCoords;
 in float Occlusion;
 
-uniform sampler2D ourTexture;
+uniform sampler2DArray textures;
 
 void main()
 {
-    vec4 tex = texture(ourTexture, TexCoords);
+    vec4 tex = texture(textures,vec3(TexCoords, 0));
 
     vec3 ambient = vec3(0.5) * tex.rgb;
 
