@@ -124,7 +124,7 @@ setupDrawing :: proc(core: ^skeewb.core_interface, render: ^Render) {
 		core.resource_string(core.resource_load("teratu", "basalt/assets/textures/default_dirt_with_grass.png")),
 		core.resource_string(core.resource_load("matu", "basalt/assets/textures/default_grass.png")),
 	}
-	gl.TexImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA8, 16, 16, i32(len(datas)), 0, gl.RGBA, gl.UNSIGNED_BYTE, nil)
+	gl.TexImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.SRGB8_ALPHA8, 16, 16, i32(len(datas)), 0, gl.RGBA, gl.UNSIGNED_BYTE, nil)
 	for tex, idx in datas {
 		pixels := stb.load_from_memory(raw_data(tex), i32(len(tex)), &width, &height, &channels, 4)
 		gl.TexSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, i32(idx), 16, 16, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixels)

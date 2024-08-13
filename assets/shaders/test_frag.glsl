@@ -21,6 +21,7 @@ void main()
     float occluse = 0.25 * Occlusion + 0.25;
 
     vec3 result = (ambient + diffuse) * occluse;
+    result = pow(result, vec3(1.0 / 2.2));
 
-    fragColor = vec4(result, tex.a);
+    fragColor = vec4(result, 1.0);
 }
