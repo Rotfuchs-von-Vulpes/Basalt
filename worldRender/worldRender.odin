@@ -180,9 +180,6 @@ frustumCulling :: proc(chunks: [dynamic]ChunkBuffer, camera: ^Camera) -> [dynami
 }
 
 drawChunks :: proc(chunks: [dynamic]ChunkBuffer, camera: Camera, render: Render) {
-	// gl.ActiveTexture(gl.TEXTURE0);
-	// gl.BindTexture(gl.TEXTURE_2D, render.texture);
-
 	for chunk in chunks {
 		pos := vec3{f32(chunk.x) * 32 - camera.pos.x, f32(chunk.y) * 32 - camera.pos.y, f32(chunk.z) * 32 - camera.pos.z}
 		model := math.matrix4_translate_f32(pos)
