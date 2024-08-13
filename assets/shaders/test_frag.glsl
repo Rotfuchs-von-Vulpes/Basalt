@@ -9,7 +9,8 @@ uniform sampler2DArray textures;
 
 void main()
 {
-    vec4 tex = texture(textures,vec3(TexCoords, 0));
+    int id = Normal.y > 0 ? 4 : Normal.y < 0 ? 2 : 3;
+    vec4 tex = texture(textures,vec3(TexCoords, id));
 
     vec3 ambient = vec3(0.5) * tex.rgb;
 

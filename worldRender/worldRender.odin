@@ -3,6 +3,7 @@ package worldRender
 import gl "vendor:OpenGL"
 import "vendor:sdl2"
 import stb "vendor:stb/image"
+import "core:strings"
 import glm "core:math/linalg/glsl"
 import math "core:math/linalg"
 
@@ -116,9 +117,19 @@ setupDrawing :: proc(core: ^skeewb.core_interface, render: ^Render) {
 	gl.TexParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
 
 	width, height, channels: i32
-	data := core.resource_string(core.resource_load("madera", "basalt/assets/textures/default_box.png"))
-	pixels := stb.load_from_memory(raw_data(data), cast(i32) len(data), &width, &height, &channels, 4)
-	gl.TexImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA8, width, height, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
+	datas := []string{
+		core.resource_string(core.resource_load("madera", "basalt/assets/textures/default_box.png")),
+		core.resource_string(core.resource_load("preda", "basalt/assets/textures/default_stone.png")),
+		core.resource_string(core.resource_load("terra", "basalt/assets/textures/default_dirt.png")),
+		core.resource_string(core.resource_load("teratu", "basalt/assets/textures/default_dirt_with_grass.png")),
+		core.resource_string(core.resource_load("matu", "basalt/assets/textures/default_grass.png")),
+	}
+	gl.TexImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA8, 16, 16, i32(len(datas)), 0, gl.RGBA, gl.UNSIGNED_BYTE, nil)
+	for tex, idx in datas {
+		pixels := stb.load_from_memory(raw_data(tex), i32(len(tex)), &width, &height, &channels, 4)
+		gl.TexSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, i32(idx), 16, 16, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
+		stb.image_free(pixels)
+	}
 	gl.GenerateMipmap(gl.TEXTURE_2D_ARRAY)
 	if sdl2.GL_ExtensionSupported("GL_EXT_texture_filter_anisotropic") {
 		filter: f32
