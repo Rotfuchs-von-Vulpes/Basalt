@@ -129,6 +129,15 @@ lastChunkX := playerCamera.chunk.x
 lastChunkY := playerCamera.chunk.y
 lastChunkZ := playerCamera.chunk.z
 
+reloadChunks :: proc() {
+	if allChunks != nil {delete(allChunks)}
+	if chunks != nil {delete(chunks)}
+	tmp := world.peak(playerCamera.chunk.x, playerCamera.chunk.y, playerCamera.chunk.z, playerCamera.viewDistance)
+	defer delete(tmp)
+	allChunks = worldRender.setupManyChunks(tmp)
+	chunks = worldRender.frustumCulling(allChunks, &playerCamera)
+}
+
 loop :: proc"c"(core: ^skeewb.core_interface) {
 	context = runtime.default_context()
 	context.allocator = mem.tracking_allocator(tracking_allocator)
@@ -210,6 +219,22 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 			worldRender.cameraMove(&playerCamera, mainRender)
 			if chunks != nil {delete(chunks)}
 			chunks = worldRender.frustumCulling(allChunks, &playerCamera)
+		} else if event.type == .MOUSEBUTTONDOWN {
+			if event.button.button == 1 {
+				chunksToDelete, pos, ok := world.destroy(playerCamera.pos, playerCamera.front)
+				defer delete(chunksToDelete)
+				if ok {
+					worldRender.destroy(chunksToDelete)
+					reloadChunks()
+				}
+			} else if event.button.button == 3 {
+				chunksToDelete, pos, ok := world.place(playerCamera.pos, playerCamera.front)
+				defer delete(chunksToDelete)
+				if ok {
+					worldRender.destroy(chunksToDelete)
+					reloadChunks()
+				}
+			}
 		}
 	}
 

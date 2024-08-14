@@ -13,9 +13,10 @@ emptyPrimer := Primer{0..<(32 * 32 * 32) = 0}
 
 iVec2 :: [2]i32
 iVec3 :: [3]i32
+vec3 :: [3]f32
 
 Chunk :: struct {
-    x, y, z: i32,
+    pos: iVec3,
     primer: Primer,
 }
 
@@ -94,7 +95,7 @@ getNewChunk :: proc(x, y, z: i32, heightMap: HeightMap) -> Chunk {
         }
     }
 
-    return Chunk{x, y, z, primer}
+    return Chunk{{x, y, z}, primer}
 }
 
 getHeightMap :: proc(x, z: i32) -> HeightMap {
@@ -166,6 +167,182 @@ peak :: proc(x, y, z: i32, radius: i32) -> [dynamic]Chunk {
     }
 
     return chunksToView
+}
+
+getPosition :: proc(pos: iVec3) -> (^Chunk, iVec3, bool) {
+    chunkPos := iVec3{
+        i32(math.floor(f32(pos.x) / 32)),
+        i32(math.floor(f32(pos.y) / 32)),
+        i32(math.floor(f32(pos.z) / 32))
+    }
+
+    chunk, ok := &chunkMap[chunkPos]
+
+    iPos: iVec3
+    iPos.x = pos.x %% 32
+    iPos.y = pos.y %% 32
+    iPos.z = pos.z %% 32
+
+    return chunk, iPos, ok
+}
+
+toiVec3 :: proc(vec: vec3) -> iVec3 {
+    return iVec3{
+        i32(math.floor(vec.x)),
+        i32(math.floor(vec.y)),
+        i32(math.floor(vec.z)),
+    }
+}
+
+raycast :: proc(origin, direction: vec3, place: bool) -> (^Chunk, iVec3, bool) {
+    fPos := origin
+    pos, pPos, lastBlock: iVec3
+
+    chunk, pChunk: ^Chunk
+    ok: bool = true
+
+    step: f32 = 0.05
+    length: f32 = 0
+    maxLength: f32 = 10
+    for length < maxLength {
+        iPos := toiVec3(fPos)
+
+        if lastBlock != iPos {
+            lastBlock = iPos
+            chunk, pos, ok = getPosition(iPos)
+            if ok && chunk.primer[pos.x * 32 * 32 + pos.z * 32 + pos.y] != 0 {
+                if place {
+                    offset := pos - pPos
+                    if math.abs(offset.x) + math.abs(offset.y) + math.abs(offset.z) != 1 {
+                        if offset.x != 0 {
+                            chunk, pos, ok = getPosition({iPos.x + offset.x, iPos.y, iPos.z})
+                            if ok && chunk.primer[pos.x * 32 * 32 + pos.z * 32 + pos.y] != 0 {
+                                return chunk, pos, true
+                            }
+                        }
+                        if offset.y != 0 {
+                            chunk, pos, ok = getPosition({iPos.x, iPos.y + offset.y, iPos.z})
+                            if ok && chunk.primer[pos.x * 32 * 32 + pos.z * 32 + pos.y] != 0 {
+                                return chunk, pos, true
+                            }
+                        }
+                        if offset.z != 0 {
+                            chunk, pos, ok = getPosition({iPos.x, iPos.y, iPos.z + offset.z})
+                            if ok && chunk.primer[pos.x * 32 * 32 + pos.z * 32 + pos.y] != 0 {
+                                return chunk, pos, true
+                            }
+                        }
+                    } else {
+                        return pChunk, pPos, true
+                    }
+                } else {
+                    return chunk, pos, true
+                }
+            }
+        }
+
+        pPos = pos
+        pChunk = chunk
+        fPos += step * direction
+        length += step
+    }
+
+    return chunk, pos, false
+}
+
+destroy :: proc(origin, direction: vec3) -> ([dynamic]^Chunk, iVec3, bool) {
+    chunks: [dynamic]^Chunk
+    chunk, pos, ok := raycast(origin, direction, false)
+
+    if !ok {return chunks, pos, false}
+    chunk.primer[pos.x * 32 * 32 + pos.z * 32 + pos.y] = 0
+    //append(&chunks, chunk)
+
+    offsetX: i32 = 0
+    offsetY: i32 = 0
+    offsetZ: i32 = 0
+
+    if pos.x >= 16 {
+        offsetX += 1
+    } else {
+        offsetX -= 1
+    }
+
+    if pos.y >= 16 {
+        offsetY += 1
+    } else {
+        offsetY -= 1
+    }
+
+    if pos.z >= 16 {
+        offsetZ += 1
+    } else {
+        offsetZ -= 1
+    }
+
+    for i in 0..=1 {
+        for j in 0..=1 {
+            for k in 0..=1 {
+                chunkCorner, ok := &chunkMap[{
+                    chunk.pos.x + i32(i) * offsetX,
+                    chunk.pos.y + i32(j) * offsetY,
+                    chunk.pos.z + i32(k) * offsetZ
+                }]
+
+                if ok {append(&chunks, chunkCorner)}
+            }
+        }
+    }
+
+    return chunks, pos, true
+}
+
+place :: proc(origin, direction: vec3) -> ([dynamic]^Chunk, iVec3, bool) {
+    chunks: [dynamic]^Chunk
+    pChunk, pPos, ok := raycast(origin, direction, true)
+
+    if !ok {return chunks, pPos, false}
+
+    if !ok {return chunks, pPos, false}
+    pChunk.primer[pPos.x * 32 * 32 + pPos.z * 32 + pPos.y] = 1
+
+    offsetX: i32 = 0
+    offsetY: i32 = 0
+    offsetZ: i32 = 0
+
+    if pPos.x >= 16 {
+        offsetX += 1
+    } else {
+        offsetX -= 1
+    }
+
+    if pPos.y >= 16 {
+        offsetY += 1
+    } else {
+        offsetY -= 1
+    }
+
+    if pPos.z >= 16 {
+        offsetZ += 1
+    } else {
+        offsetZ -= 1
+    }
+
+    for i in 0..=1 {
+        for j in 0..=1 {
+            for k in 0..=1 {
+                chunkCorner, ok := &chunkMap[{
+                    pChunk.pos.x + i32(i) * offsetX,
+                    pChunk.pos.y + i32(j) * offsetY,
+                    pChunk.pos.z + i32(k) * offsetZ
+                }]
+
+                if ok {append(&chunks, chunkCorner)}
+            }
+        }
+    }
+
+    return chunks, pPos, true
 }
 
 nuke :: proc() {

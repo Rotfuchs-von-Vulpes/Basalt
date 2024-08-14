@@ -55,11 +55,11 @@ setupChunk :: proc(chunk: world.Chunk) -> ChunkBuffer {
 	gl.VertexAttribPointer(2, 2, gl.FLOAT, false, 9 * size_of(f32), 6 * size_of(f32))
 	gl.VertexAttribPointer(3, 1, gl.FLOAT, false, 9 * size_of(f32), 8 * size_of(f32))
 
-    return ChunkBuffer{chunk.x, chunk.y, chunk.z, VAO, VBO, EBO, i32(len(indices))}
+    return ChunkBuffer{chunk.pos.x, chunk.pos.y, chunk.pos.z, VAO, VBO, EBO, i32(len(indices))}
 }
 
 eval :: proc(chunk: world.Chunk) -> ChunkBuffer {
-    pos := iVec3{chunk.x, chunk.y, chunk.z}
+    pos := iVec3{chunk.pos.x, chunk.pos.y, chunk.pos.z}
     chunkBuffer, ok, _ := util.map_force_get(&chunkMap, pos)
     if ok {
         chunkBuffer^ = setupChunk(chunk)
@@ -196,4 +196,10 @@ nuke :: proc() {
 		gl.DeleteBuffers(1, &chunk.EBO)
 	}
     delete(chunkMap)
+}
+
+destroy :: proc(chunks: [dynamic]^world.Chunk) {
+	for chunk in chunks {
+		delete_key(&chunkMap, iVec3{chunk.pos.x, chunk.pos.y, chunk.pos.z})
+	}
 }

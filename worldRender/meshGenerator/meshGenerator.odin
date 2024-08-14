@@ -274,9 +274,9 @@ makeVertices :: proc(faces: [dynamic]Face, primer: world.Primer, primers: Primer
 
 generateMesh :: proc(chunk: world.Chunk) -> ([dynamic]u32, [dynamic]f32) {
     primer := chunk.primer
-    x := chunk.x
-    y := chunk.y
-    z := chunk.z
+    x := chunk.pos.x
+    y := chunk.pos.y
+    z := chunk.pos.z
     
     primers: Primers
 
