@@ -103,7 +103,7 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	defer delete(tmp)
 	allChunks = worldRender.setupManyChunks(tmp)
 
-	gl.ClearColor(0.1, 0.1, 0.1, 1.0)
+	gl.ClearColor(0.4666, 0.6588, 1.0, 1.0)
     
 	gl.UseProgram(mainRender.program)
 
