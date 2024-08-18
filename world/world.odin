@@ -80,7 +80,7 @@ getTerrain :: proc(x, z: i32, i, j: int) -> i32 {
     peaking := getNoised(peaksAndValleys, posX, posZ)
     earlyTerrain := mix(continent, eroding, peaking)
 
-    return i32(31 * earlyTerrain)
+    return i32(31 * earlyTerrain + 32)
 }
 
 getNewChunk :: proc(x, y, z: i32, heightMap: HeightMap) -> Chunk {
@@ -160,8 +160,8 @@ peak :: proc(x, y, z: i32, radius: i32) -> [dynamic]Chunk {
             terrains := evalTerrain(x + i, z + j)
             defer delete(terrains)
             for terrain, height in terrains {
-                chunk := eval(x + i, i32(height), z + j, terrain);
-                if (i != -radiusP && i != radiusP) && (j != -radiusP && j != radiusP) {append(&chunksToView, chunk)}
+                chunk := eval(x + i, i32(height) - 1, z + j, terrain);
+                if (i != -radiusP && i != radiusP) && (j != -radiusP && j != radiusP) && (height > 0) {append(&chunksToView, chunk)}
             }
         }
     }
@@ -250,13 +250,8 @@ raycast :: proc(origin, direction: vec3, place: bool) -> (^Chunk, iVec3, bool) {
     return chunk, pos, false
 }
 
-destroy :: proc(origin, direction: vec3) -> ([dynamic]^Chunk, iVec3, bool) {
+atualizeChunks :: proc(chunk: ^Chunk, pos: iVec3) -> [dynamic]^Chunk {
     chunks: [dynamic]^Chunk
-    chunk, pos, ok := raycast(origin, direction, false)
-
-    if !ok {return chunks, pos, false}
-    chunk.primer[pos.x * 32 * 32 + pos.z * 32 + pos.y] = 0
-    //append(&chunks, chunk)
 
     offsetX: i32 = 0
     offsetY: i32 = 0
@@ -294,55 +289,31 @@ destroy :: proc(origin, direction: vec3) -> ([dynamic]^Chunk, iVec3, bool) {
         }
     }
 
+    return chunks
+}
+
+destroy :: proc(origin, direction: vec3) -> ([dynamic]^Chunk, iVec3, bool) {
+    chunks: [dynamic]^Chunk
+    chunk, pos, ok := raycast(origin, direction, false)
+
+    if !ok {return chunks, pos, false}
+    chunk.primer[pos.x * 32 * 32 + pos.z * 32 + pos.y] = 0
+
+    chunks = atualizeChunks(chunk, pos)
+
     return chunks, pos, true
 }
 
 place :: proc(origin, direction: vec3) -> ([dynamic]^Chunk, iVec3, bool) {
     chunks: [dynamic]^Chunk
-    pChunk, pPos, ok := raycast(origin, direction, true)
+    chunk, pos, ok := raycast(origin, direction, true)
 
-    if !ok {return chunks, pPos, false}
+    if !ok {return chunks, pos, false}
+    chunk.primer[pos.x * 32 * 32 + pos.z * 32 + pos.y] = 1
+    
+    chunks = atualizeChunks(chunk, pos)
 
-    if !ok {return chunks, pPos, false}
-    pChunk.primer[pPos.x * 32 * 32 + pPos.z * 32 + pPos.y] = 1
-
-    offsetX: i32 = 0
-    offsetY: i32 = 0
-    offsetZ: i32 = 0
-
-    if pPos.x >= 16 {
-        offsetX += 1
-    } else {
-        offsetX -= 1
-    }
-
-    if pPos.y >= 16 {
-        offsetY += 1
-    } else {
-        offsetY -= 1
-    }
-
-    if pPos.z >= 16 {
-        offsetZ += 1
-    } else {
-        offsetZ -= 1
-    }
-
-    for i in 0..=1 {
-        for j in 0..=1 {
-            for k in 0..=1 {
-                chunkCorner, ok := &chunkMap[{
-                    pChunk.pos.x + i32(i) * offsetX,
-                    pChunk.pos.y + i32(j) * offsetY,
-                    pChunk.pos.z + i32(k) * offsetZ
-                }]
-
-                if ok {append(&chunks, chunkCorner)}
-            }
-        }
-    }
-
-    return chunks, pPos, true
+    return chunks, pos, true
 }
 
 nuke :: proc() {
