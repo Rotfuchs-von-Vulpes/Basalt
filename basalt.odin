@@ -94,6 +94,7 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	gl.Enable(gl.DEPTH_TEST)
 	gl.Enable(gl.CULL_FACE)
 	gl.CullFace(gl.BACK)
+
 	// gl.Enable(gl.BLEND)
 	// gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 

@@ -67,5 +67,5 @@ void main()
 
     vec3 diffuse = CalculateLighting(albedo.rgb, Normal, vec2(0, 1), gl_FragCoord.xyz);
 
-    fragColor = vec4(diffuse, albedo.a);
+    fragColor = vec4(diffuse, 1.0);
 }
