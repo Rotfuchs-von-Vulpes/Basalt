@@ -100,9 +100,9 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 
 	worldRender.setupDrawing(core, &mainRender)
 
-	tmp := world.peak(playerCamera.chunk.x, playerCamera.chunk.y, playerCamera.chunk.z, playerCamera.viewDistance)
-	defer delete(tmp)
-	allChunks = worldRender.setupManyChunks(tmp)
+	// tmp := world.peak(playerCamera.chunk.x, playerCamera.chunk.y, playerCamera.chunk.z, playerCamera.viewDistance)
+	// defer delete(tmp)
+	// allChunks = worldRender.setupManyChunks(tmp)
 
 	gl.ClearColor(0.4666, 0.6588, 1.0, 1.0)
     
@@ -120,8 +120,6 @@ toFront := false
 toBehind := false
 toRight := false
 toLeft := false
-
-moved: bool
 
 yaw: f32 = -90.0;
 pitch: f32 = 0.0;
@@ -268,7 +266,7 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	chunkX := i32(math.floor(playerCamera.pos.x / 32))
 	chunkY := i32(math.floor(playerCamera.pos.y / 32))
 	chunkZ := i32(math.floor(playerCamera.pos.z / 32))
-	moved = false
+	moved := false
 
 	if chunkX != lastChunkX {
 		playerCamera.chunk.x = chunkX
@@ -286,14 +284,7 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 		moved = true
 	}
 
-	if moved {
-		if allChunks != nil {delete(allChunks)}
-		if chunks != nil {delete(chunks)}
-		tmp := world.peak(playerCamera.chunk.x, playerCamera.chunk.y, playerCamera.chunk.z, playerCamera.viewDistance)
-		defer delete(tmp)
-		allChunks = worldRender.setupManyChunks(tmp)
-		chunks = worldRender.frustumCulling(allChunks, &playerCamera)
-	}
+	if moved {reloadChunks()}
 	
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
