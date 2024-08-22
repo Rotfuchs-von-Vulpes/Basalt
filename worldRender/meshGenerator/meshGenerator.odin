@@ -56,10 +56,6 @@ Face :: struct {
     corners: [Corner]Point,
 }
 
-toIndex :: proc(pos: BlockPos) -> u16 {
-    return u16(pos.x) * 32 * 32 + u16(pos.y) + u16(pos.z) * 32
-}
-
 toVec3 :: proc(vec: BlockPos) -> vec3 {
     return vec3{f32(vec.x), f32(vec.y), f32(vec.z)}
 }
@@ -108,16 +104,16 @@ isSideExposed :: proc(primers: Primers, pos: BlockPos, offset: Pos) -> bool {
     sidePos = BlockPos{u8(i8(sidePos.x) + x), u8(i8(sidePos.y) + y), u8(i8(sidePos.z) + z)}
     idx := (chunkYOffset + 1) * 3 * 3 + (chunkXOffset + 1) * 3 + chunkZOffset + 1
     if primers[idx] == nil {return true}
-    return primers[idx].primer[toIndex(sidePos)] == 0;
+    return primers[idx].primer[sidePos.x][sidePos.y][sidePos.z] == 0;
 }
 
 hasSideExposed :: proc(primers: Primers, pos: BlockPos) -> bool {
-    if isSideExposed(primers, pos, Pos{-1, 0, 0}) {return true}
-    if isSideExposed(primers, pos, Pos{ 1, 0, 0}) {return true}
-    if isSideExposed(primers, pos, Pos{ 0,-1, 0}) {return true}
-    if isSideExposed(primers, pos, Pos{ 0, 1, 0}) {return true}
-    if isSideExposed(primers, pos, Pos{ 0, 0,-1}) {return true}
-    if isSideExposed(primers, pos, Pos{ 0, 0, 1}) {return true}
+    if isSideExposed(primers, pos, {-1, 0, 0}) {return true}
+    if isSideExposed(primers, pos, { 1, 0, 0}) {return true}
+    if isSideExposed(primers, pos, { 0,-1, 0}) {return true}
+    if isSideExposed(primers, pos, { 0, 1, 0}) {return true}
+    if isSideExposed(primers, pos, { 0, 0,-1}) {return true}
+    if isSideExposed(primers, pos, { 0, 0, 1}) {return true}
 
     return false
 }
@@ -129,7 +125,7 @@ filterCubes :: proc(primers: Primers) -> [dynamic]Cube {
         for j in 0..< 32 {
             for k in 0..< 32 {
                 pos := BlockPos{u8(i), u8(j), u8(k)}
-                id := primers[1 * 3 * 3 + 1 * 3 + 1].primer[toIndex(pos)]
+                id := primers[1 * 3 * 3 + 1 * 3 + 1].primer[pos.x][pos.y][pos.z]
 
                 if id == 0 {continue}
 
@@ -148,12 +144,12 @@ makeCubes :: proc(primers: Primers, cubes: [dynamic]Cube) -> [dynamic]CubeFaces 
         pos := cube.pos
         faces := FaceSet{}
 
-        if isSideExposed(primers, pos, Pos{-1, 0, 0}) {faces = faces + {.West}};
-        if isSideExposed(primers, pos, Pos{ 1, 0, 0}) {faces = faces + {.East}};
-        if isSideExposed(primers, pos, Pos{ 0,-1, 0}) {faces = faces + {.Bottom}};
-        if isSideExposed(primers, pos, Pos{ 0, 1, 0}) {faces = faces + {.Up}};
-        if isSideExposed(primers, pos, Pos{ 0, 0,-1}) {faces = faces + {.South}};
-        if isSideExposed(primers, pos, Pos{ 0, 0, 1}) {faces = faces + {.North}};
+        if isSideExposed(primers, pos, {-1, 0, 0}) {faces = faces + {.West}};
+        if isSideExposed(primers, pos, { 1, 0, 0}) {faces = faces + {.East}};
+        if isSideExposed(primers, pos, { 0,-1, 0}) {faces = faces + {.Bottom}};
+        if isSideExposed(primers, pos, { 0, 1, 0}) {faces = faces + {.Up}};
+        if isSideExposed(primers, pos, { 0, 0,-1}) {faces = faces + {.South}};
+        if isSideExposed(primers, pos, { 0, 0, 1}) {faces = faces + {.North}};
 
         append(&cubesFaces, CubeFaces{cube.id, pos, faces})
     }
@@ -244,7 +240,7 @@ getAO :: proc(pos: BlockPos, offset: vec3, direction: Direction, primers: Primer
     if offset.z == 0 {signZ = -1}
 
     cornerPrimer, cornerPos, ok := getBlockPos(primers, posV + {signX, signY, signZ})
-    corner := cornerPrimer.primer[toIndex(cornerPos)]
+    corner := cornerPrimer.primer[cornerPos.x][cornerPos.y][cornerPos.z]
     side1Pos, side2Pos: Pos
 
     if up.x != 0 {
@@ -260,8 +256,8 @@ getAO :: proc(pos: BlockPos, offset: vec3, direction: Direction, primers: Primer
 
     side1Primer, side1Pos2, ok1 := getBlockPos(primers, side1Pos)
     side2Primer, side2Pos2, ok2 := getBlockPos(primers, side2Pos)
-    side1 := side1Primer.primer[toIndex(side1Pos2)]
-    side2 := side2Primer.primer[toIndex(side2Pos2)]
+    side1 := side1Primer.primer[side1Pos2.x][side1Pos2.y][side1Pos2.z]
+    side2 := side2Primer.primer[side2Pos2.x][side2Pos2.y][side2Pos2.z]
 
     if side1 != 0 && side2 != 0 {return 0}
     if corner != 0 && (side1 != 0 || side2 != 0) {return 1}

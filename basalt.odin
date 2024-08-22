@@ -182,7 +182,7 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 			xpos :=  f32(event.motion.xrel)
 			ypos := -f32(event.motion.yrel)
 		
-			sensitivity: f32 = 0.1
+			sensitivity: f32 = 0.25
 			xoffset := xpos * sensitivity
 			yoffset := ypos * sensitivity
 		

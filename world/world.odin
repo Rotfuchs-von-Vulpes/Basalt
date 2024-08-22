@@ -6,10 +6,8 @@ import "core:math"
 import "core:fmt"
 import "../util"
 
-Primer :: [32 * 32 * 32]u32
+Primer :: [32][32][32]u32
 HeightMap :: [32][32]i32
-
-emptyPrimer := Primer{0..<(32 * 32 * 32) = 0}
 
 iVec2 :: [2]i32
 iVec3 :: [3]i32
@@ -85,13 +83,13 @@ getTerrain :: proc(x, z: i32, i, j: int) -> i32 {
 }
 
 getNewChunk :: proc(x, y, z: i32, heightMap: HeightMap) -> Chunk {
-    primer := Primer{0..<(32 * 32 * 32) = 0}
+    primer := Primer{0..<32 = {0..<32 = {0..<32 = 0}}}
     
     for i in 0..<32 {
         for j in 0..<32 {
             height := int(heightMap[i][j])
             for k in 0..<height {
-                primer[i * 32 * 32 + j * 32 + k] = 1
+                primer[i][k][j] = 1
             }
         }
     }
@@ -170,7 +168,13 @@ eval :: proc(x, y, z: i32) -> Chunk {
     if ok {
         terrains, init := getHeightMap(x, z)
         defer delete(terrains)
-        chunk^ = getNewChunk(x, y, z, terrains[int(y) + init])
+        if len(terrains) >= int(y) + init {
+            chunk^ = getNewChunk(x, y, z, terrains[int(y) + init])
+        } else if y > 0 {
+            chunk^ = Chunk{{x, y, z}, Primer{0..<32 = {0..<32 = {0..<32 = 0}}}}
+        } else {
+            chunk^ = Chunk{{x, y, z}, Primer{0..<32 = {0..<32 = {0..<32 = 1}}}}
+        }
     }
     return chunk^
 }
@@ -209,12 +213,12 @@ getPosition :: proc(pos: iVec3) -> (^Chunk, iVec3, bool) {
 
     if !ok {
         if chunkPos.y < 1 {
-            chunkP := Chunk{chunkPos, Primer{0..<(32 * 32 * 32) = 1}}
+            chunkP := Chunk{chunkPos, Primer{0..<32 = {0..<32 = {0..<32 = 1}}}}
             chunkMap[chunkPos] = chunkP
             slice := &heightSlice[{chunkPos.x, chunkPos.z}]
             slice[0] = int(chunkPos.y)
         } else {
-            chunkP := Chunk{chunkPos, Primer{0..<(32 * 32 * 32) = 0}}
+            chunkP := Chunk{chunkPos, Primer{0..<32 = {0..<32 = {0..<32 = 0}}}}
             chunkMap[chunkPos] = chunkP
             slice := &heightSlice[{chunkPos.x, chunkPos.z}]
             slice[1] = int(chunkPos.y)
@@ -248,25 +252,25 @@ raycast :: proc(origin, direction: vec3, place: bool) -> (^Chunk, iVec3, bool) {
 
         if lastBlock != iPos {
             chunk, pos, ok = getPosition(iPos)
-            if ok && chunk.primer[pos.x * 32 * 32 + pos.z * 32 + pos.y] != 0 {
+            if ok && chunk.primer[pos.x][pos.y][pos.z] != 0 {
                 if place {
                     offset := iPos - lastBlock
                     if math.abs(offset.x) + math.abs(offset.y) + math.abs(offset.z) != 1 {
                         if offset.x != 0 {
                             chunk, pos, ok = getPosition({iPos.x + offset.x, iPos.y, iPos.z})
-                            if ok && chunk.primer[pos.x * 32 * 32 + pos.z * 32 + pos.y] != 0 {
+                            if ok && chunk.primer[pos.x][pos.y][pos.z] != 0 {
                                 return chunk, pos, true
                             }
                         }
                         if offset.y != 0 {
                             chunk, pos, ok = getPosition({iPos.x, iPos.y + offset.y, iPos.z})
-                            if ok && chunk.primer[pos.x * 32 * 32 + pos.z * 32 + pos.y] != 0 {
+                            if ok && chunk.primer[pos.x][pos.y][pos.z] != 0 {
                                 return chunk, pos, true
                             }
                         }
                         if offset.z != 0 {
                             chunk, pos, ok = getPosition({iPos.x, iPos.y, iPos.z + offset.z})
-                            if ok && chunk.primer[pos.x * 32 * 32 + pos.z * 32 + pos.y] != 0 {
+                            if ok && chunk.primer[pos.x][pos.y][pos.z] != 0 {
                                 return chunk, pos, true
                             }
                         }
@@ -327,12 +331,12 @@ atualizeChunks :: proc(chunk: ^Chunk, pos: iVec3) -> [dynamic]^Chunk {
 
                 if !ok {
                     if chunkPos.y < 1 {
-                        chunkP := Chunk{chunkPos, Primer{0..<(32 * 32 * 32) = 1}}
+                        chunkP := Chunk{chunkPos, Primer{0..<32 = {0..<32 = {0..<32 = 1}}}}
                         chunkMap[chunkPos] = chunkP
                         slice := &heightSlice[{chunkPos.x, chunkPos.z}]
                         slice[0] = int(chunkPos.y)
                     } else {
-                        chunkP := Chunk{chunkPos, Primer{0..<(32 * 32 * 32) = 0}}
+                        chunkP := Chunk{chunkPos, Primer{0..<32 = {0..<32 = {0..<32 = 0}}}}
                         chunkMap[chunkPos] = chunkP
                         slice := &heightSlice[{chunkPos.x, chunkPos.z}]
                         slice[1] = int(chunkPos.y)
@@ -353,7 +357,7 @@ destroy :: proc(origin, direction: vec3) -> ([dynamic]^Chunk, iVec3, bool) {
     chunk, pos, ok := raycast(origin, direction, false)
 
     if !ok {return chunks, pos, false}
-    chunk.primer[pos.x * 32 * 32 + pos.z * 32 + pos.y] = 0
+    chunk.primer[pos.x][pos.y][pos.z] = 0
 
     chunks = atualizeChunks(chunk, pos)
 
@@ -365,7 +369,7 @@ place :: proc(origin, direction: vec3) -> ([dynamic]^Chunk, iVec3, bool) {
     chunk, pos, ok := raycast(origin, direction, true)
 
     if !ok {return chunks, pos, false}
-    chunk.primer[pos.x * 32 * 32 + pos.z * 32 + pos.y] = 1
+    chunk.primer[pos.x][pos.y][pos.z] = 1
     
     chunks = atualizeChunks(chunk, pos)
 
