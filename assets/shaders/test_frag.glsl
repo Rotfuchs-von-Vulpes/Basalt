@@ -58,12 +58,22 @@ vec3 CalculateLighting(vec3 albedo, vec3 normal, vec2 lightmapCoords, vec3 fragC
     return diffuse;
 }
 
+vec3 ACESFilm(vec3 rgb) {
+  rgb *= 0.6;
+  float a = 2.51;
+  float b = 0.03;
+  float c = 2.43;
+  float d = 0.59;
+  float e = 0.14;
+  return (rgb*(a*rgb+b))/(rgb*(c*rgb+d)+e);
+}
+
 void main()
 {
     int id = Normal.y > 0 ? 4 : Normal.y < 0 ? 2 : 3;
     vec4 albedo = texture(textures,vec3(TexCoords, id));
     float occluse = 0.25 * Occlusion + 0.25;
-    albedo.rgb = pow(albedo.rgb, vec3(1.0 / 2.2)) * occluse;
+    albedo.rgb = pow(ACESFilm(albedo.rgb), vec3(1.0 / 2.2)) * occluse;
 
     vec3 diffuse = CalculateLighting(albedo.rgb, Normal, vec2(0, 1), gl_FragCoord.xyz);
 
