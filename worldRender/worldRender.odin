@@ -95,18 +95,17 @@ Render :: struct{
 }
 
 setupDrawing :: proc(core: ^skeewb.core_interface, render: ^Render) {
-	vertShader := core.resource_load("vert", "basalt/assets/shaders/test_vert.glsl")
-	fragShader := core.resource_load("frag", "basalt/assets/shaders/test_frag.glsl")
+	vertShader := core.resource_load("block_vert", "basalt/assets/shaders/blocks_vert.glsl")
+	fragShader := core.resource_load("block_frag", "basalt/assets/shaders/blocks_frag.glsl")
 
-	shaderSuccess : bool
+	shaderSuccess: bool
 	render.program, shaderSuccess = gl.load_shaders_source(core.resource_string(vertShader), core.resource_string(fragShader))
 
     if !shaderSuccess {
-        len: i32
         info: [^]u8
         gl.GetShaderInfoLog(render.program, 1024, nil, info)
         a, b, c, d := gl.get_last_error_messages()
-        skeewb.console_log(.ERROR, "could not compile shaders\n %s\n %s", a, c)
+        skeewb.console_log(.ERROR, "could not compile blocks shaders\n %s\n %s", a, c)
     }
 
 	gl.GenTextures(1, &render.texture)

@@ -13,9 +13,6 @@ import gl "vendor:OpenGL"
 import "world"
 import "worldRender"
 
-vert_raw :: #load("assets/shaders/test_vert.glsl")
-frag_raw :: #load("assets/shaders/test_frag.glsl")
-
 @(export)
 load :: proc"c"(core: ^skeewb.core_interface) -> skeewb.module_desc {
 	context = runtime.default_context()
@@ -48,12 +45,26 @@ playerCamera := worldRender.Camera{
 	math.MATRIX4F32_IDENTITY, math.MATRIX4F32_IDENTITY
 }
 
-mainRender := worldRender.Render{{}, 0, 0}
+blockRender := worldRender.Render{{}, 0, 0}
+fboRender := worldRender.Render{{}, 0, 0}
 
 chunks: [dynamic]worldRender.ChunkBuffer
 allChunks: [dynamic]worldRender.ChunkBuffer
 
 tracking_allocator: ^mem.Tracking_Allocator
+
+vao, vbo, fbo, colorBuffer, depthBuffer: u32
+
+quadVertices := [?]f32{
+	// positions   // texCoords
+	-1.0,  1.0,  0.0, 1.0,
+	-1.0, -1.0,  0.0, 0.0,
+	 1.0, -1.0,  1.0, 0.0,
+
+	-1.0,  1.0,  0.0, 1.0,
+	 1.0, -1.0,  1.0, 0.0,
+	 1.0,  1.0,  1.0, 1.0
+};
 
 start :: proc"c"(core: ^skeewb.core_interface) {
 	context = runtime.default_context()
@@ -98,7 +109,7 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	// gl.Enable(gl.BLEND)
 	// gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
-	worldRender.setupDrawing(core, &mainRender)
+	worldRender.setupDrawing(core, &blockRender)
 
 	// tmp := world.peak(playerCamera.chunk.x, playerCamera.chunk.y, playerCamera.chunk.z, playerCamera.viewDistance)
 	// defer delete(tmp)
@@ -106,12 +117,66 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 
 	gl.ClearColor(0.4666, 0.6588, 1.0, 1.0)
     
-	gl.UseProgram(mainRender.program)
+	gl.UseProgram(blockRender.program)
 
-	mainRender.uniforms = gl.get_uniforms_from_program(mainRender.program)
+	blockRender.uniforms = gl.get_uniforms_from_program(blockRender.program)
+	
 
-	worldRender.cameraSetup(&playerCamera, mainRender)
-	worldRender.cameraMove(&playerCamera, mainRender)
+	gl.GenFramebuffers(1, &fbo)
+	gl.BindFramebuffer(gl.FRAMEBUFFER, fbo)
+	gl.GenTextures(1, &colorBuffer)
+	gl.BindTexture(gl.TEXTURE_2D, colorBuffer)
+	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGB, screenWidth, screenHeight, 0, gl.RGB, gl.UNSIGNED_BYTE, nil)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+	gl.BindTexture(gl.TEXTURE_2D, 0)
+	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, colorBuffer, 0)
+	
+	gl.ActiveTexture(gl.TEXTURE0)
+	gl.GenTextures(1, &depthBuffer)
+	gl.BindTexture(gl.TEXTURE_2D, depthBuffer)
+	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32, screenWidth, screenHeight, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, nil)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_BORDER)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_BORDER)
+	gl.TexParameterfv(gl.TEXTURE_2D, gl.TEXTURE_BORDER_COLOR, raw_data([]f32{1, 1, 1, 1}))
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+	gl.BindTexture(gl.TEXTURE_2D, 0)
+
+	gl.FramebufferTexture(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, depthBuffer, 0)
+
+	if gl.CheckFramebufferStatus(gl.FRAMEBUFFER) != u32(gl.FRAMEBUFFER_COMPLETE) {
+		skeewb.console_log(.ERROR, "Framebuffer is not complete!")
+		core.quit(-1)
+	}
+
+	gl.GenVertexArrays(1, &vao)
+	gl.GenBuffers(1, &vbo)
+	gl.BindVertexArray(vao)
+	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
+	gl.BufferData(gl.ARRAY_BUFFER, len(quadVertices)*size_of(quadVertices[0]), &quadVertices, gl.STATIC_DRAW)
+	gl.EnableVertexAttribArray(0)
+	gl.VertexAttribPointer(0, 2, gl.FLOAT, false, 4 * size_of(quadVertices[0]), 0)
+	gl.EnableVertexAttribArray(1)
+	gl.VertexAttribPointer(1, 2, gl.FLOAT, false, 4 * size_of(quadVertices[0]), 2 * size_of(quadVertices[0]))
+
+	vertShader := core.resource_load("quad_vert", "basalt/assets/shaders/quad_vert.glsl")
+	fragShader := core.resource_load("quad_frag", "basalt/assets/shaders/quad_frag.glsl")
+
+	shaderSuccess: bool
+	fboRender.program, shaderSuccess = gl.load_shaders_source(core.resource_string(vertShader), core.resource_string(fragShader))
+
+    if !shaderSuccess {
+        info: [^]u8
+        gl.GetShaderInfoLog(fboRender.program, 1024, nil, info)
+        a, b, c, d := gl.get_last_error_messages()
+        skeewb.console_log(.ERROR, "could not compile fbo shaders\n %s\n %s", a, c)
+    }
+
+	gl.UseProgram(blockRender.program)
+
+	worldRender.cameraSetup(&playerCamera, blockRender)
+	worldRender.cameraMove(&playerCamera, blockRender)
 
 	chunks = worldRender.frustumCulling(allChunks, &playerCamera)
 }
@@ -145,6 +210,8 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	t := f32(time.duration_seconds(duration))
 
 	event: sdl2.Event
+
+	gl.UseProgram(blockRender.program)
 		
 	for sdl2.PollEvent(&event) {
 		if event.type == .QUIT || event.type == .WINDOWEVENT && event.window.event == .CLOSE {
@@ -215,7 +282,7 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 
 			playerCamera.right = math.cross(playerCamera.front, playerCamera.up)
 			
-			worldRender.cameraMove(&playerCamera, mainRender)
+			worldRender.cameraMove(&playerCamera, blockRender)
 			if chunks != nil {delete(chunks)}
 			chunks = worldRender.frustumCulling(allChunks, &playerCamera)
 		} else if event.type == .MOUSEBUTTONDOWN {
@@ -285,10 +352,28 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	}
 
 	if moved {reloadChunks()}
-	
-	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-	worldRender.drawChunks(chunks, playerCamera, mainRender)
+	gl.BindFramebuffer(gl.FRAMEBUFFER, fbo)
+	gl.Enable(gl.DEPTH_TEST)
+	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+	gl.UseProgram(blockRender.program)
+	
+	// gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+	// gl.ActiveTexture(gl.TEXTURE0);
+
+	worldRender.drawChunks(chunks, playerCamera, blockRender)
+	
+	gl.BindFramebuffer(gl.FRAMEBUFFER, 0);
+	gl.Disable(gl.DEPTH_TEST);
+	gl.Clear(gl.COLOR_BUFFER_BIT);
+
+	gl.UseProgram(fboRender.program);
+	gl.BindVertexArray(vao);
+	gl.ActiveTexture(gl.TEXTURE0);
+	gl.BindTexture(gl.TEXTURE_2D, colorBuffer);
+	gl.ActiveTexture(gl.TEXTURE1);
+	gl.BindTexture(gl.TEXTURE_2D, depthBuffer);
+	gl.DrawArrays(gl.TRIANGLES, 0, 6);
 
 	sdl2.GL_SwapWindow(window)
 }
@@ -305,11 +390,12 @@ quit :: proc"c"(core: ^skeewb.core_interface){
 	worldRender.nuke()
 	world.nuke()
 
-	for key, value in mainRender.uniforms {
+	for key, value in blockRender.uniforms {
 		delete(value.name)
 	}
-	delete(mainRender.uniforms)
-	gl.DeleteProgram(mainRender.program)
+	delete(blockRender.uniforms)
+	gl.DeleteProgram(blockRender.program)
+	gl.DeleteFramebuffers(1, &fbo)
 	for &chunk in chunks {
 		gl.DeleteBuffers(1, &chunk.VBO)
 		gl.DeleteBuffers(1, &chunk.EBO)
