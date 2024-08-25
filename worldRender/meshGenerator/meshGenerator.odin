@@ -103,7 +103,7 @@ isSideExposed :: proc(primers: Primers, pos: BlockPos, offset: Pos) -> bool {
 
     sidePos = BlockPos{u8(i8(sidePos.x) + x), u8(i8(sidePos.y) + y), u8(i8(sidePos.z) + z)}
     idx := (chunkYOffset + 1) * 3 * 3 + (chunkXOffset + 1) * 3 + chunkZOffset + 1
-    if primers[idx] == nil {return true}
+    if primers[idx] == nil {return false}
     return primers[idx].primer[sidePos.x][sidePos.y][sidePos.z] == 0;
 }
 

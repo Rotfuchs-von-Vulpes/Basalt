@@ -204,29 +204,29 @@ getPosition :: proc(pos: iVec3) -> (^Chunk, iVec3, bool) {
         i32(math.floor(f32(pos.z) / 32))
     }
 
-    chunk, ok := &chunkMap[chunkPos]
+    chunk, ok, _ := util.map_force_get(&chunkMap, chunkPos)
 
     iPos: iVec3
     iPos.x = pos.x %% 32
     iPos.y = pos.y %% 32
     iPos.z = pos.z %% 32
 
-    if !ok {
+    if ok {
         if chunkPos.y < 1 {
             chunkP := Chunk{chunkPos, Primer{0..<32 = {0..<32 = {0..<32 = 1}}}}
-            chunkMap[chunkPos] = chunkP
+            chunk^ = chunkP
             slice := &heightSlice[{chunkPos.x, chunkPos.z}]
             slice[0] = int(chunkPos.y)
         } else {
             chunkP := Chunk{chunkPos, Primer{0..<32 = {0..<32 = {0..<32 = 0}}}}
-            chunkMap[chunkPos] = chunkP
+            chunk^ = chunkP
             slice := &heightSlice[{chunkPos.x, chunkPos.z}]
             slice[1] = int(chunkPos.y)
         }
-        chunk, ok = &chunkMap[chunkPos]
+        ok = true
     }
 
-    return chunk, iPos, ok
+    return chunk, iPos, !ok
 }
 
 toiVec3 :: proc(vec: vec3) -> iVec3 {
@@ -327,21 +327,20 @@ atualizeChunks :: proc(chunk: ^Chunk, pos: iVec3) -> [dynamic]^Chunk {
                     chunk.pos.y + i32(j) * offsetY,
                     chunk.pos.z + i32(k) * offsetZ
                 }
-                chunkCorner, ok := &chunkMap[chunkPos]
+                chunkCorner, ok, _ := util.map_force_get(&chunkMap, chunkPos)
 
-                if !ok {
+                if ok {
                     if chunkPos.y < 1 {
                         chunkP := Chunk{chunkPos, Primer{0..<32 = {0..<32 = {0..<32 = 1}}}}
-                        chunkMap[chunkPos] = chunkP
+                        chunkCorner^ = chunkP
                         slice := &heightSlice[{chunkPos.x, chunkPos.z}]
                         slice[0] = int(chunkPos.y)
                     } else {
                         chunkP := Chunk{chunkPos, Primer{0..<32 = {0..<32 = {0..<32 = 0}}}}
-                        chunkMap[chunkPos] = chunkP
+                        chunkCorner^ = chunkP
                         slice := &heightSlice[{chunkPos.x, chunkPos.z}]
                         slice[1] = int(chunkPos.y)
                     }
-                    chunkCorner, ok = &chunkMap[chunkPos]
                 }
 
                 append(&chunks, chunkCorner)
