@@ -45,15 +45,23 @@ playerCamera := worldRender.Camera{
 	math.MATRIX4F32_IDENTITY, math.MATRIX4F32_IDENTITY
 }
 
+FrameBuffer :: struct{
+	id: u32,
+	vao: u32,
+	vbo: u32,
+	uniforms: map[string]gl.Uniform_Info,
+	program: u32,
+	texture: u32,
+	depth: u32,
+}
+
 blockRender := worldRender.Render{{}, 0, 0}
-fboRender := worldRender.Render{{}, 0, 0}
+fboRender := FrameBuffer{0, 0, 0, {}, 0, 0, 0}
 
 chunks: [dynamic]worldRender.ChunkBuffer
 allChunks: [dynamic]worldRender.ChunkBuffer
 
 tracking_allocator: ^mem.Tracking_Allocator
-
-vao, vbo, fbo, colorBuffer, depthBuffer: u32
 
 quadVertices := [?]f32{
 	// positions   // texCoords
@@ -116,25 +124,30 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	// allChunks = worldRender.setupManyChunks(tmp)
 
 	gl.ClearColor(0.4666, 0.6588, 1.0, 1.0)
-    
-	gl.UseProgram(blockRender.program)
 
 	blockRender.uniforms = gl.get_uniforms_from_program(blockRender.program)
+
+	worldRender.cameraSetup(&playerCamera, blockRender)
+	worldRender.cameraMove(&playerCamera, blockRender)
+
+	chunks = worldRender.frustumCulling(allChunks, &playerCamera)
 	
 
-	gl.GenFramebuffers(1, &fbo)
-	gl.BindFramebuffer(gl.FRAMEBUFFER, fbo)
-	gl.GenTextures(1, &colorBuffer)
-	gl.BindTexture(gl.TEXTURE_2D, colorBuffer)
-	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGB, screenWidth, screenHeight, 0, gl.RGB, gl.UNSIGNED_BYTE, nil)
+	gl.GenFramebuffers(1, &fboRender.id)
+	gl.BindFramebuffer(gl.FRAMEBUFFER, fboRender.id)
+
+	gl.ActiveTexture(gl.TEXTURE0)
+	gl.GenTextures(1, &fboRender.texture)
+	gl.BindTexture(gl.TEXTURE_2D, fboRender.texture)
+	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGB16F, screenWidth, screenHeight, 0, gl.RGB, gl.UNSIGNED_BYTE, nil)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
-	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, colorBuffer, 0)
+	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, fboRender.texture, 0)
 	
-	gl.ActiveTexture(gl.TEXTURE0)
-	gl.GenTextures(1, &depthBuffer)
-	gl.BindTexture(gl.TEXTURE_2D, depthBuffer)
+	gl.ActiveTexture(gl.TEXTURE1)
+	gl.GenTextures(1, &fboRender.depth)
+	gl.BindTexture(gl.TEXTURE_2D, fboRender.depth)
 	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32, screenWidth, screenHeight, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, nil)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_BORDER)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_BORDER)
@@ -143,17 +156,17 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 
-	gl.FramebufferTexture(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, depthBuffer, 0)
+	gl.FramebufferTexture(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, fboRender.depth, 0)
 
 	if gl.CheckFramebufferStatus(gl.FRAMEBUFFER) != u32(gl.FRAMEBUFFER_COMPLETE) {
 		skeewb.console_log(.ERROR, "Framebuffer is not complete!")
 		core.quit(-1)
 	}
 
-	gl.GenVertexArrays(1, &vao)
-	gl.GenBuffers(1, &vbo)
-	gl.BindVertexArray(vao)
-	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
+	gl.GenVertexArrays(1, &fboRender.vao)
+	gl.GenBuffers(1, &fboRender.vbo)
+	gl.BindVertexArray(fboRender.vao)
+	gl.BindBuffer(gl.ARRAY_BUFFER, fboRender.vbo)
 	gl.BufferData(gl.ARRAY_BUFFER, len(quadVertices)*size_of(quadVertices[0]), &quadVertices, gl.STATIC_DRAW)
 	gl.EnableVertexAttribArray(0)
 	gl.VertexAttribPointer(0, 2, gl.FLOAT, false, 4 * size_of(quadVertices[0]), 0)
@@ -172,13 +185,16 @@ start :: proc"c"(core: ^skeewb.core_interface) {
         a, b, c, d := gl.get_last_error_messages()
         skeewb.console_log(.ERROR, "could not compile fbo shaders\n %s\n %s", a, c)
     }
-
-	gl.UseProgram(blockRender.program)
-
-	worldRender.cameraSetup(&playerCamera, blockRender)
-	worldRender.cameraMove(&playerCamera, blockRender)
-
-	chunks = worldRender.frustumCulling(allChunks, &playerCamera)
+	
+	fboRender.uniforms = gl.get_uniforms_from_program(fboRender.program)
+	gl.UseProgram(fboRender.program)
+	
+	gl.Uniform1i(fboRender.uniforms["screenTexture"].location, 0)
+	gl.Uniform1i(fboRender.uniforms["depthTexture"].location, 1)
+	gl.Uniform1f(fboRender.uniforms["viewWidth"].location, f32(screenWidth))
+	gl.Uniform1f(fboRender.uniforms["viewHeight"].location, f32(screenHeight))
+	inv := math.inverse(playerCamera.proj)
+	gl.UniformMatrix4fv(fboRender.uniforms["projectionInverse"].location, 1, false, &inv[0, 0])
 }
 
 toFront := false
@@ -210,8 +226,6 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	t := f32(time.duration_seconds(duration))
 
 	event: sdl2.Event
-
-	gl.UseProgram(blockRender.program)
 		
 	for sdl2.PollEvent(&event) {
 		if event.type == .QUIT || event.type == .WINDOWEVENT && event.window.event == .CLOSE {
@@ -282,9 +296,13 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 
 			playerCamera.right = math.cross(playerCamera.front, playerCamera.up)
 			
+			gl.UseProgram(blockRender.program)
 			worldRender.cameraMove(&playerCamera, blockRender)
 			if chunks != nil {delete(chunks)}
 			chunks = worldRender.frustumCulling(allChunks, &playerCamera)
+
+			gl.UseProgram(fboRender.program)
+			gl.UniformMatrix4fv(fboRender.uniforms["view"].location, 1, false, &playerCamera.view[0, 0])
 		} else if event.type == .MOUSEBUTTONDOWN {
 			if event.button.button == 1 {
 				chunksToDelete, pos, ok := world.destroy(playerCamera.pos, playerCamera.front)
@@ -351,29 +369,26 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 		moved = true
 	}
 
+	gl.UseProgram(blockRender.program)
 	if moved {reloadChunks()}
 
-	gl.BindFramebuffer(gl.FRAMEBUFFER, fbo)
+	gl.BindFramebuffer(gl.FRAMEBUFFER, fboRender.id)
 	gl.Enable(gl.DEPTH_TEST)
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-	gl.UseProgram(blockRender.program)
-	
-	// gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-	// gl.ActiveTexture(gl.TEXTURE0);
 
 	worldRender.drawChunks(chunks, playerCamera, blockRender)
 	
-	gl.BindFramebuffer(gl.FRAMEBUFFER, 0);
-	gl.Disable(gl.DEPTH_TEST);
-	gl.Clear(gl.COLOR_BUFFER_BIT);
+	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
+	gl.Disable(gl.DEPTH_TEST)
+	//gl.Clear(gl.COLOR_BUFFER_BIT)
 
-	gl.UseProgram(fboRender.program);
-	gl.BindVertexArray(vao);
-	gl.ActiveTexture(gl.TEXTURE0);
-	gl.BindTexture(gl.TEXTURE_2D, colorBuffer);
-	gl.ActiveTexture(gl.TEXTURE1);
-	gl.BindTexture(gl.TEXTURE_2D, depthBuffer);
-	gl.DrawArrays(gl.TRIANGLES, 0, 6);
+	gl.UseProgram(fboRender.program)
+	gl.BindVertexArray(fboRender.vao)
+	gl.ActiveTexture(gl.TEXTURE0)
+	gl.BindTexture(gl.TEXTURE_2D, fboRender.texture)
+	gl.ActiveTexture(gl.TEXTURE1)
+	gl.BindTexture(gl.TEXTURE_2D, fboRender.depth)
+	gl.DrawArrays(gl.TRIANGLES, 0, 6)
 
 	sdl2.GL_SwapWindow(window)
 }
@@ -393,9 +408,14 @@ quit :: proc"c"(core: ^skeewb.core_interface){
 	for key, value in blockRender.uniforms {
 		delete(value.name)
 	}
+	for key, value in fboRender.uniforms {
+		delete(value.name)
+	}
 	delete(blockRender.uniforms)
+	delete(fboRender.uniforms)
 	gl.DeleteProgram(blockRender.program)
-	gl.DeleteFramebuffers(1, &fbo)
+	gl.DeleteProgram(fboRender.program)
+	gl.DeleteFramebuffers(1, &fboRender.id)
 	for &chunk in chunks {
 		gl.DeleteBuffers(1, &chunk.VBO)
 		gl.DeleteBuffers(1, &chunk.EBO)

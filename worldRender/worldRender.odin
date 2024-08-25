@@ -108,6 +108,8 @@ setupDrawing :: proc(core: ^skeewb.core_interface, render: ^Render) {
         skeewb.console_log(.ERROR, "could not compile blocks shaders\n %s\n %s", a, c)
     }
 
+	gl.UseProgram(render.program)
+
 	gl.GenTextures(1, &render.texture)
 	gl.BindTexture(gl.TEXTURE_2D_ARRAY, render.texture)
 	gl.TexParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT)
