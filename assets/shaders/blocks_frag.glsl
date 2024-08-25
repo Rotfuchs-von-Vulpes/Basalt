@@ -1,6 +1,7 @@
 #version 330 core
 
 out vec4 fragColor;
+in vec3 Pos;
 in vec3 Normal;
 in vec2 TexCoords;
 in float Occlusion;
@@ -33,6 +34,7 @@ vec2 AdjustLightmap(in vec2 lightmap) {
 }
 
 vec3 skyColor = vec3(0.4666, 0.6588, 1.0);
+vec3 fogColor = vec3(0.6666, 0.8156, 0.9921);
 
 vec3 CalculateLighting(vec3 albedo, vec3 normal, vec2 lightmapCoords, vec3 fragCoords) {
     vec3 sunDirection = normalize(-vec3(-0.2f, -1.0f, -0.3f));
@@ -77,5 +79,9 @@ void main()
 
     vec3 diffuse = CalculateLighting(albedo.rgb, Normal, vec2(0, 1), gl_FragCoord.xyz);
 
-    fragColor = vec4(diffuse, 1.0);
+    float fragDist = length(Pos) / 6;
+    float fogFactor = 1.0 - exp(fragDist * fragDist * -0.005);
+    fogFactor = clamp(fogFactor, 0.0, 1.0);
+
+    fragColor = vec4(mix(diffuse, fogColor, fogFactor), 1.0);
 }
