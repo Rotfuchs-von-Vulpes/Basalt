@@ -77,17 +77,6 @@ setupManyChunks :: proc(chunks: [dynamic]world.Chunk) -> [dynamic]ChunkBuffer {
     return chunksBuffers;
 }
 
-Camera :: struct{
-	pos: vec3,
-	front: vec3,
-	up: vec3,
-	right: vec3,
-	chunk: [3]i32,
-	viewDistance: i32,
-    viewPort: vec2,
-	proj, view: mat4
-}
-
 Render :: struct{
 	uniforms: map[string]gl.Uniform_Info,
 	program: u32,
@@ -139,12 +128,12 @@ setupDrawing :: proc(core: ^skeewb.core_interface, render: ^Render) {
 	}
 }
 
-cameraSetup :: proc(camera: ^Camera, render: Render) {
+cameraSetup :: proc(camera: ^util.Camera, render: Render) {
 	camera.proj = math.matrix4_infinite_perspective_f32(45, camera.viewPort.x / camera.viewPort.y, 0.1)
 	gl.UniformMatrix4fv(render.uniforms["projection"].location, 1, false, &camera.proj[0, 0])
 }
 
-cameraMove :: proc(camera: ^Camera, render: Render) {
+cameraMove :: proc(camera: ^util.Camera, render: Render) {
 	camera.view = math.matrix4_look_at_f32({0, 0, 0}, camera.front, camera.up)
 	gl.UniformMatrix4fv(render.uniforms["view"].location, 1, false, &camera.view[0, 0])
 }
@@ -166,7 +155,7 @@ testAabb :: proc(MPV: mat4, min, max: vec3) -> bool
 		pzX * (pzX < 0 ? min[0] : max[0]) + pzY * (pzY < 0 ? min[1] : max[1]) + pzZ * (pzZ < 0 ? min[2] : max[2]) >= -pzW;
 }
 
-frustumCulling :: proc(chunks: [dynamic]ChunkBuffer, camera: ^Camera) -> [dynamic]ChunkBuffer {
+frustumCulling :: proc(chunks: [dynamic]ChunkBuffer, camera: ^util.Camera) -> [dynamic]ChunkBuffer {
 	chunksBuffers: [dynamic]ChunkBuffer
 
 	PV := camera.proj * camera.view
@@ -180,7 +169,7 @@ frustumCulling :: proc(chunks: [dynamic]ChunkBuffer, camera: ^Camera) -> [dynami
 	return chunksBuffers
 }
 
-drawChunks :: proc(chunks: [dynamic]ChunkBuffer, camera: Camera, render: Render) {
+drawChunks :: proc(chunks: [dynamic]ChunkBuffer, camera: util.Camera, render: Render) {
 	for chunk in chunks {
 		pos := vec3{f32(chunk.x) * 32 - camera.pos.x, f32(chunk.y) * 32 - camera.pos.y, f32(chunk.z) * 32 - camera.pos.z}
 		model := math.matrix4_translate_f32(pos)

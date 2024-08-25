@@ -12,6 +12,8 @@ import gl "vendor:OpenGL"
 
 import "world"
 import "worldRender"
+import "frameBuffer"
+import "util"
 
 @(export)
 load :: proc"c"(core: ^skeewb.core_interface) -> skeewb.module_desc {
@@ -35,7 +37,7 @@ gl_context: sdl2.GLContext
 screenWidth: i32 = 854
 screenHeight: i32 = 480
 
-playerCamera := worldRender.Camera{
+playerCamera := util.Camera{
 	{1, 33, 1}, 
 	{0, 0, -1}, 
 	{0, 1, 0}, 
@@ -45,34 +47,13 @@ playerCamera := worldRender.Camera{
 	math.MATRIX4F32_IDENTITY, math.MATRIX4F32_IDENTITY
 }
 
-FrameBuffer :: struct{
-	id: u32,
-	vao: u32,
-	vbo: u32,
-	uniforms: map[string]gl.Uniform_Info,
-	program: u32,
-	texture: u32,
-	depth: u32,
-}
-
 blockRender := worldRender.Render{{}, 0, 0}
-fboRender := FrameBuffer{0, 0, 0, {}, 0, 0, 0}
+fboRender := frameBuffer.Render{0, 0, 0, {}, 0, 0, 0}
 
 chunks: [dynamic]worldRender.ChunkBuffer
 allChunks: [dynamic]worldRender.ChunkBuffer
 
 tracking_allocator: ^mem.Tracking_Allocator
-
-quadVertices := [?]f32{
-	// positions   // texCoords
-	-1.0,  1.0,  0.0, 1.0,
-	-1.0, -1.0,  0.0, 0.0,
-	 1.0, -1.0,  1.0, 0.0,
-
-	-1.0,  1.0,  0.0, 1.0,
-	 1.0, -1.0,  1.0, 0.0,
-	 1.0,  1.0,  1.0, 1.0
-};
 
 start :: proc"c"(core: ^skeewb.core_interface) {
 	context = runtime.default_context()
@@ -131,70 +112,8 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	worldRender.cameraMove(&playerCamera, blockRender)
 
 	chunks = worldRender.frustumCulling(allChunks, &playerCamera)
-	
 
-	gl.GenFramebuffers(1, &fboRender.id)
-	gl.BindFramebuffer(gl.FRAMEBUFFER, fboRender.id)
-
-	gl.ActiveTexture(gl.TEXTURE0)
-	gl.GenTextures(1, &fboRender.texture)
-	gl.BindTexture(gl.TEXTURE_2D, fboRender.texture)
-	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGB16F, screenWidth, screenHeight, 0, gl.RGB, gl.UNSIGNED_BYTE, nil)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-	gl.BindTexture(gl.TEXTURE_2D, 0)
-	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, fboRender.texture, 0)
-	
-	gl.ActiveTexture(gl.TEXTURE1)
-	gl.GenTextures(1, &fboRender.depth)
-	gl.BindTexture(gl.TEXTURE_2D, fboRender.depth)
-	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32, screenWidth, screenHeight, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, nil)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_BORDER)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_BORDER)
-	gl.TexParameterfv(gl.TEXTURE_2D, gl.TEXTURE_BORDER_COLOR, raw_data([]f32{1, 1, 1, 1}))
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
-	gl.BindTexture(gl.TEXTURE_2D, 0)
-
-	gl.FramebufferTexture(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, fboRender.depth, 0)
-
-	if gl.CheckFramebufferStatus(gl.FRAMEBUFFER) != u32(gl.FRAMEBUFFER_COMPLETE) {
-		skeewb.console_log(.ERROR, "Framebuffer is not complete!")
-		core.quit(-1)
-	}
-
-	gl.GenVertexArrays(1, &fboRender.vao)
-	gl.GenBuffers(1, &fboRender.vbo)
-	gl.BindVertexArray(fboRender.vao)
-	gl.BindBuffer(gl.ARRAY_BUFFER, fboRender.vbo)
-	gl.BufferData(gl.ARRAY_BUFFER, len(quadVertices)*size_of(quadVertices[0]), &quadVertices, gl.STATIC_DRAW)
-	gl.EnableVertexAttribArray(0)
-	gl.VertexAttribPointer(0, 2, gl.FLOAT, false, 4 * size_of(quadVertices[0]), 0)
-	gl.EnableVertexAttribArray(1)
-	gl.VertexAttribPointer(1, 2, gl.FLOAT, false, 4 * size_of(quadVertices[0]), 2 * size_of(quadVertices[0]))
-
-	vertShader := core.resource_load("quad_vert", "basalt/assets/shaders/quad_vert.glsl")
-	fragShader := core.resource_load("quad_frag", "basalt/assets/shaders/quad_frag.glsl")
-
-	shaderSuccess: bool
-	fboRender.program, shaderSuccess = gl.load_shaders_source(core.resource_string(vertShader), core.resource_string(fragShader))
-
-    if !shaderSuccess {
-        info: [^]u8
-        gl.GetShaderInfoLog(fboRender.program, 1024, nil, info)
-        a, b, c, d := gl.get_last_error_messages()
-        skeewb.console_log(.ERROR, "could not compile fbo shaders\n %s\n %s", a, c)
-    }
-	
-	fboRender.uniforms = gl.get_uniforms_from_program(fboRender.program)
-	gl.UseProgram(fboRender.program)
-	
-	gl.Uniform1i(fboRender.uniforms["screenTexture"].location, 0)
-	gl.Uniform1i(fboRender.uniforms["depthTexture"].location, 1)
-	gl.Uniform1f(fboRender.uniforms["viewWidth"].location, f32(screenWidth))
-	gl.Uniform1f(fboRender.uniforms["viewHeight"].location, f32(screenHeight))
-	inv := math.inverse(playerCamera.proj)
-	gl.UniformMatrix4fv(fboRender.uniforms["projectionInverse"].location, 1, false, &inv[0, 0])
+	frameBuffer.setup(core, &playerCamera, &fboRender)
 }
 
 toFront := false
@@ -379,16 +298,7 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	worldRender.drawChunks(chunks, playerCamera, blockRender)
 	
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-	gl.Disable(gl.DEPTH_TEST)
-	//gl.Clear(gl.COLOR_BUFFER_BIT)
-
-	gl.UseProgram(fboRender.program)
-	gl.BindVertexArray(fboRender.vao)
-	gl.ActiveTexture(gl.TEXTURE0)
-	gl.BindTexture(gl.TEXTURE_2D, fboRender.texture)
-	gl.ActiveTexture(gl.TEXTURE1)
-	gl.BindTexture(gl.TEXTURE_2D, fboRender.depth)
-	gl.DrawArrays(gl.TRIANGLES, 0, 6)
+	frameBuffer.draw(fboRender)
 
 	sdl2.GL_SwapWindow(window)
 }

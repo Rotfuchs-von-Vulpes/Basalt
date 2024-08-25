@@ -1,6 +1,23 @@
 package util
 
 import "base:runtime"
+import glm "core:math/linalg/glsl"
+
+mat4 :: glm.mat4x4
+vec2 :: [2]f32
+vec3 :: [3]f32
+vec4 :: [4]f32
+
+Camera :: struct{
+	pos: vec3,
+	front: vec3,
+	up: vec3,
+	right: vec3,
+	chunk: [3]i32,
+	viewDistance: i32,
+    viewPort: vec2,
+	proj, view: mat4
+}
 
 map_force_get :: proc(m: ^$T/map[$K]$V, key: K) -> (value: ^V, just_inserted: bool, err: runtime.Allocator_Error) {
     key := key
