@@ -7,6 +7,9 @@ in vec2 TexCoords;
 in float Occlusion;
 
 uniform sampler2DArray textures;
+uniform vec3 sunDirection;
+uniform vec3 skyColor;
+uniform vec3 fogColor;
 
 float luminance(vec3 color) {
     return dot(color, vec3(0.2125f, 0.7153f, 0.0721f));
@@ -33,12 +36,9 @@ vec2 AdjustLightmap(in vec2 lightmap) {
     return newLightmap;
 }
 
-vec3 skyColor = vec3(0.4666, 0.6588, 1.0);
-vec3 fogColor = vec3(0.6666, 0.8156, 0.9921);
-
 vec3 CalculateLighting(vec3 albedo, vec3 normal, vec2 lightmapCoords, vec3 fragCoords) {
-    vec3 sunDirection = normalize(-vec3(-0.2f, -1.0f, -0.3f));
     float sunVisibility  = clamp((dot( sunDirection, vec3(0.0, 1.0, 0.0)) + 0.05) * 10.0, 0.0, 1.0);
+    float moonVisibility = clamp((dot(-sunDirection, vec3(0.0, 1.0, 0.0)) + 0.05) * 10.0, 0.0, 1.0);
 
     vec2 lightmap = AdjustLightmap(lightmapCoords);
     vec3 torchColor = vec3(0.98f, 0.68f, 0.55f);
@@ -48,6 +48,7 @@ vec3 CalculateLighting(vec3 albedo, vec3 normal, vec2 lightmapCoords, vec3 fragC
     vec3 lightColor = torchLight + skyLight;
 
     vec3 ndotl = sunColor * clamp(4 * dot(normal, sunDirection), 0.0f, 1.0f) * sunVisibility;
+    ndotl += moonColor * clamp(4 * dot(normal, -sunDirection), 0.0f, 1.0f) * moonVisibility;
     ndotl *= 1.3;
     ndotl *= (luminance(skyColor) + 0.01f);
     ndotl *= lightmap.g;

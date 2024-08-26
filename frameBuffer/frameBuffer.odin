@@ -6,6 +6,7 @@ import glm "core:math/linalg/glsl"
 
 import "../skeewb"
 import "../util"
+import "../sky"
 
 mat4 :: glm.mat4x4
 vec2 :: [2]f32
@@ -87,8 +88,8 @@ setup :: proc(core: ^skeewb.core_interface, camera: ^util.Camera, render: ^Rende
         skeewb.console_log(.ERROR, "could not compile fbo shaders\n %s\n %s", a, c)
     }
 	
-	render.uniforms = gl.get_uniforms_from_program(render.program)
 	gl.UseProgram(render.program)
+	render.uniforms = gl.get_uniforms_from_program(render.program)
 	
 	gl.Uniform1i(render.uniforms["screenTexture"].location, 0)
 	gl.Uniform1i(render.uniforms["depthTexture"].location, 1)
@@ -100,11 +101,14 @@ setup :: proc(core: ^skeewb.core_interface, camera: ^util.Camera, render: ^Rende
 
 draw :: proc(render: Render) {
 	gl.Disable(gl.DEPTH_TEST)
-	gl.UseProgram(render.program)
+
 	gl.BindVertexArray(render.vao)
 	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, render.texture)
 	gl.ActiveTexture(gl.TEXTURE1)
 	gl.BindTexture(gl.TEXTURE_2D, render.depth)
+
+	gl.Uniform3f(render.uniforms["skyColor"].location, sky.skyColor.r, sky.skyColor.g, sky.skyColor.b)
+	gl.Uniform3f(render.uniforms["fogColor"].location, sky.fogColor.r, sky.fogColor.g, sky.fogColor.b)
 	gl.DrawArrays(gl.TRIANGLES, 0, 6)
 }

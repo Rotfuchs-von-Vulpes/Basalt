@@ -10,6 +10,7 @@ import math "core:math/linalg"
 import "../skeewb"
 import "../world"
 import "../util"
+import "../sky"
 import mesh "meshGenerator"
 
 ChunkBuffer :: struct{
@@ -128,16 +129,6 @@ setupDrawing :: proc(core: ^skeewb.core_interface, render: ^Render) {
 	}
 }
 
-cameraSetup :: proc(camera: ^util.Camera, render: Render) {
-	camera.proj = math.matrix4_infinite_perspective_f32(45, camera.viewPort.x / camera.viewPort.y, 0.1)
-	gl.UniformMatrix4fv(render.uniforms["projection"].location, 1, false, &camera.proj[0, 0])
-}
-
-cameraMove :: proc(camera: ^util.Camera, render: Render) {
-	camera.view = math.matrix4_look_at_f32({0, 0, 0}, camera.front, camera.up)
-	gl.UniformMatrix4fv(render.uniforms["view"].location, 1, false, &camera.view[0, 0])
-}
-
 testAabb :: proc(MPV: mat4, min, max: vec3) -> bool
 {
 	nxX := MPV[0][3] + MPV[0][0]; nxY := MPV[1][3] + MPV[1][0]; nxZ := MPV[2][3] + MPV[2][0]; nxW := MPV[3][3] + MPV[3][0]
@@ -169,13 +160,18 @@ frustumCulling :: proc(chunks: [dynamic]ChunkBuffer, camera: ^util.Camera) -> [d
 	return chunksBuffers
 }
 
-drawChunks :: proc(chunks: [dynamic]ChunkBuffer, camera: util.Camera, render: Render) {
+drawChunks :: proc(chunks: [dynamic]ChunkBuffer, camera: ^util.Camera, render: Render) {
+	gl.UniformMatrix4fv(render.uniforms["projection"].location, 1, false, &camera.proj[0, 0])
+	gl.UniformMatrix4fv(render.uniforms["view"].location, 1, false, &camera.view[0, 0])
+	gl.Uniform3f(render.uniforms["sunDirection"].location, sky.sunDirection.x, sky.sunDirection.y, sky.sunDirection.z)
+	gl.Uniform3f(render.uniforms["skyColor"].location, sky.skyColor.r, sky.skyColor.g, sky.skyColor.b)
+	gl.Uniform3f(render.uniforms["fogColor"].location, sky.fogColor.r, sky.fogColor.g, sky.fogColor.b)
 	for chunk in chunks {
 		pos := vec3{f32(chunk.x) * 32 - camera.pos.x, f32(chunk.y) * 32 - camera.pos.y, f32(chunk.z) * 32 - camera.pos.z}
 		model := math.matrix4_translate_f32(pos)
 		gl.UniformMatrix4fv(render.uniforms["model"].location, 1, false, &model[0, 0])
 
-		gl.BindVertexArray(chunk.VAO);
+		gl.BindVertexArray(chunk.VAO)
 		gl.DrawElements(gl.TRIANGLES, chunk.length, gl.UNSIGNED_INT, nil)
 	}
 }

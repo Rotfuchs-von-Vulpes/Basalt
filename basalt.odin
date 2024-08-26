@@ -14,6 +14,7 @@ import "world"
 import "worldRender"
 import "frameBuffer"
 import "util"
+import "sky"
 
 @(export)
 load :: proc"c"(core: ^skeewb.core_interface) -> skeewb.module_desc {
@@ -49,11 +50,20 @@ playerCamera := util.Camera{
 
 blockRender := worldRender.Render{{}, 0, 0}
 fboRender := frameBuffer.Render{0, 0, 0, {}, 0, 0, 0}
+skyRender := sky.Render{0, 0, {}, 0, 0}
 
 chunks: [dynamic]worldRender.ChunkBuffer
 allChunks: [dynamic]worldRender.ChunkBuffer
 
 tracking_allocator: ^mem.Tracking_Allocator
+
+cameraSetup :: proc() {
+	playerCamera.proj = math.matrix4_infinite_perspective_f32(45, playerCamera.viewPort.x / playerCamera.viewPort.y, 0.1)
+}
+
+cameraMove :: proc() {
+	playerCamera.view = math.matrix4_look_at_f32({0, 0, 0}, playerCamera.front, playerCamera.up)
+}
 
 start :: proc"c"(core: ^skeewb.core_interface) {
 	context = runtime.default_context()
@@ -108,12 +118,14 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 
 	blockRender.uniforms = gl.get_uniforms_from_program(blockRender.program)
 
-	worldRender.cameraSetup(&playerCamera, blockRender)
-	worldRender.cameraMove(&playerCamera, blockRender)
-
-	chunks = worldRender.frustumCulling(allChunks, &playerCamera)
+	playerCamera.proj = math.matrix4_infinite_perspective_f32(45, playerCamera.viewPort.x / playerCamera.viewPort.y, 0.1)
+	playerCamera.view = math.matrix4_look_at_f32({0, 0, 0}, playerCamera.front, playerCamera.up)
 
 	frameBuffer.setup(core, &playerCamera, &fboRender)
+
+	sky.setup(core, &playerCamera, &skyRender)
+
+	chunks = worldRender.frustumCulling(allChunks, &playerCamera)
 }
 
 toFront := false
@@ -142,7 +154,7 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	context.allocator = mem.tracking_allocator(tracking_allocator)
 	
 	duration := time.tick_since(start_tick)
-	t := f32(time.duration_seconds(duration))
+	seconds := f32(time.duration_seconds(duration))
 
 	event: sdl2.Event
 		
@@ -215,13 +227,9 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 
 			playerCamera.right = math.cross(playerCamera.front, playerCamera.up)
 			
-			gl.UseProgram(blockRender.program)
-			worldRender.cameraMove(&playerCamera, blockRender)
+			playerCamera.view = math.matrix4_look_at_f32({0, 0, 0}, playerCamera.front, playerCamera.up)
 			if chunks != nil {delete(chunks)}
 			chunks = worldRender.frustumCulling(allChunks, &playerCamera)
-
-			gl.UseProgram(fboRender.program)
-			gl.UniformMatrix4fv(fboRender.uniforms["view"].location, 1, false, &playerCamera.view[0, 0])
 		} else if event.type == .MOUSEBUTTONDOWN {
 			if event.button.button == 1 {
 				chunksToDelete, pos, ok := world.destroy(playerCamera.pos, playerCamera.front)
@@ -288,16 +296,20 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 		moved = true
 	}
 
-	gl.UseProgram(blockRender.program)
 	if moved {reloadChunks()}
 
 	gl.BindFramebuffer(gl.FRAMEBUFFER, fboRender.id)
 	gl.Enable(gl.DEPTH_TEST)
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-	worldRender.drawChunks(chunks, playerCamera, blockRender)
+	gl.UseProgram(skyRender.program)
+	sky.draw(&playerCamera, skyRender, seconds)
+	gl.UseProgram(blockRender.program)
+	worldRender.drawChunks(chunks, &playerCamera, blockRender)
 	
+	gl.UseProgram(fboRender.program)
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
+	gl.UniformMatrix4fv(fboRender.uniforms["view"].location, 1, false, &playerCamera.view[0, 0])
 	frameBuffer.draw(fboRender)
 
 	sdl2.GL_SwapWindow(window)
@@ -321,10 +333,15 @@ quit :: proc"c"(core: ^skeewb.core_interface){
 	for key, value in fboRender.uniforms {
 		delete(value.name)
 	}
+	for key, value in skyRender.uniforms {
+		delete(value.name)
+	}
 	delete(blockRender.uniforms)
 	delete(fboRender.uniforms)
+	delete(skyRender.uniforms)
 	gl.DeleteProgram(blockRender.program)
 	gl.DeleteProgram(fboRender.program)
+	gl.DeleteProgram(skyRender.program)
 	gl.DeleteFramebuffers(1, &fboRender.id)
 	for &chunk in chunks {
 		gl.DeleteBuffers(1, &chunk.VBO)
