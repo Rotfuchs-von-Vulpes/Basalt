@@ -88,15 +88,8 @@ setup :: proc(core: ^skeewb.core_interface, camera: ^util.Camera, render: ^Rende
         skeewb.console_log(.ERROR, "could not compile fbo shaders\n %s\n %s", a, c)
     }
 	
-	gl.UseProgram(render.program)
 	render.uniforms = gl.get_uniforms_from_program(render.program)
-	
 	gl.Uniform1i(render.uniforms["screenTexture"].location, 0)
-	gl.Uniform1i(render.uniforms["depthTexture"].location, 1)
-	gl.Uniform1f(render.uniforms["viewWidth"].location, camera.viewPort.x)
-	gl.Uniform1f(render.uniforms["viewHeight"].location, camera.viewPort.y)
-	inv := math.inverse(camera.proj)
-	gl.UniformMatrix4fv(render.uniforms["projectionInverse"].location, 1, false, &inv[0, 0])
 }
 
 draw :: proc(render: Render) {
@@ -108,7 +101,6 @@ draw :: proc(render: Render) {
 	gl.ActiveTexture(gl.TEXTURE1)
 	gl.BindTexture(gl.TEXTURE_2D, render.depth)
 
-	gl.Uniform3f(render.uniforms["skyColor"].location, sky.skyColor.r, sky.skyColor.g, sky.skyColor.b)
-	gl.Uniform3f(render.uniforms["fogColor"].location, sky.fogColor.r, sky.fogColor.g, sky.fogColor.b)
+	//gl.Uniform1i(render.uniforms["depthTexture"].location, 1)
 	gl.DrawArrays(gl.TRIANGLES, 0, 6)
 }

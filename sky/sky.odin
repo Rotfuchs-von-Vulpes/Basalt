@@ -24,13 +24,13 @@ Render :: struct{
 
 quadVertices := [?]f32{
 	// positions   // texCoords
-	-1.0,  1.0, 0.0,  0.0, 1.0,
-	-1.0, -1.0, 0.0,  0.0, 0.0,
-	 1.0, -1.0, 0.0,  1.0, 0.0,
+	-1.0,  1.0, 0.0, 1.0,
+	-1.0, -1.0, 0.0, 0.0,
+	 1.0, -1.0, 1.0, 0.0,
  
-	-1.0,  1.0, 0.0,  0.0, 1.0,
-	 1.0, -1.0, 0.0,  1.0, 0.0,
-	 1.0,  1.0, 0.0,  1.0, 1.0
+	-1.0,  1.0, 0.0, 1.0,
+	 1.0, -1.0, 1.0, 0.0,
+	 1.0,  1.0, 1.0, 1.0
 }
 
 model: mat4
@@ -38,6 +38,71 @@ model: mat4
 sunDirection := vec3{0, 1, 0}
 
 setup :: proc(core: ^skeewb.core_interface, camera: ^util.Camera, render: ^Render) {
+	gl.GenVertexArrays(1, &render.vao)
+	gl.BindVertexArray(render.vao)
+
+	gl.GenBuffers(1, &render.vbo)
+    gl.BindBuffer(gl.ARRAY_BUFFER, render.vbo)
+    gl.BufferData(gl.ARRAY_BUFFER, len(quadVertices)*size_of(quadVertices[0]), &quadVertices, gl.STATIC_DRAW)
+	
+	gl.EnableVertexAttribArray(0)
+	gl.EnableVertexAttribArray(1)
+	gl.VertexAttribPointer(0, 2, gl.FLOAT, false, 4 * size_of(f32), 0)
+	gl.VertexAttribPointer(1, 2, gl.FLOAT, false, 4 * size_of(f32), 2 * size_of(f32))
+
+	vertShader := core.resource_load("sky_vert", "basalt/assets/shaders/sky_vert.glsl")
+	fragShader := core.resource_load("sky_frag", "basalt/assets/shaders/sky_frag.glsl")
+
+	shaderSuccess: bool
+	render.program, shaderSuccess = gl.load_shaders_source(core.resource_string(vertShader), core.resource_string(fragShader))
+
+    if !shaderSuccess {
+        info: [^]u8
+        gl.GetShaderInfoLog(render.program, 1024, nil, info)
+        a, b, c, d := gl.get_last_error_messages()
+        skeewb.console_log(.ERROR, "could not compile sky shaders\n %s\n %s", a, c)
+    }
+	
+	gl.UseProgram(render.program)
+	render.uniforms = gl.get_uniforms_from_program(render.program)
+}
+
+dayTime: f32 = 1200000
+skyBlue := vec3{0.4666, 0.6588, 1.0}
+fogBlue := vec3{0.6666, 0.8156, 0.9921};
+skyColor := skyBlue
+fogColor := fogBlue
+
+draw :: proc(camera: ^util.Camera, render: Render, time: f32) {
+	cycle := math.fract(time / dayTime)
+	angle := 2 * math.PI * cycle
+	brightness: f32 = clamp(math.cos(angle) * 2 + 0.5, 0, 1)
+	skyColor = skyBlue
+	fogColor = fogBlue
+	skyColor *= brightness
+	fogColor *= brightness
+    // sunDirection = math.normalize(vec3{math.sin(angle), math.cos(angle) * math.sin(f32(math.RAD_PER_DEG) * 75), math.cos(angle) * math.cos(f32(math.RAD_PER_DEG) * 75)})
+    // right := math.normalize(math.cross(vec3{0, 1, 0}, sunDirection))
+    // up := math.normalize(math.cross(sunDirection, right))
+    pos := camera.front
+	model := 
+	math.matrix4_translate_f32(pos) * 
+	math.matrix4_rotate_f32(0.5 * math.PI - math.atan2(math.length(pos.xz), pos.y), -math.normalize(math.cross(vec3{0, 1, 0}, camera.front))) * 
+	math.matrix4_rotate_f32(-0.5 * math.PI - math.atan2(pos.z, pos.x), {0, 1, 0}) * 
+	math.matrix4_scale(vec3{1, camera.viewPort.y / camera.viewPort.x, 0})
+    gl.UniformMatrix4fv(render.uniforms["model"].location, 1, false, &model[0, 0])
+	gl.UniformMatrix4fv(render.uniforms["projection"].location, 1, false, &camera.proj[0, 0])
+	gl.UniformMatrix4fv(render.uniforms["view"].location, 1, false, &camera.view[0, 0])
+	gl.Uniform1f(render.uniforms["ratio"].location, camera.viewPort.y / camera.viewPort.x)
+	//gl.Uniform3f(render.uniforms["sunDirection"].location, sunDirection.x, sunDirection.y, sunDirection.z)
+	gl.Uniform3f(render.uniforms["skyColor"].location, skyColor.r, skyColor.g, skyColor.b)
+	gl.Uniform3f(render.uniforms["fogColor"].location, fogColor.r, fogColor.g, fogColor.b)
+
+    gl.BindVertexArray(render.vao)
+    gl.DrawArrays(gl.TRIANGLES, 0, 6)
+}
+
+setupSun :: proc(core: ^skeewb.core_interface, camera: ^util.Camera, render: ^Render) {
 	gl.GenTextures(1, &render.texture)
 	gl.BindTexture(gl.TEXTURE_2D_ARRAY, render.texture)
 	gl.TexParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT)
@@ -75,11 +140,11 @@ setup :: proc(core: ^skeewb.core_interface, camera: ^util.Camera, render: ^Rende
 	
 	gl.EnableVertexAttribArray(0)
 	gl.EnableVertexAttribArray(1)
-	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, 5 * size_of(f32), 0)
-	gl.VertexAttribPointer(1, 2, gl.FLOAT, false, 5 * size_of(f32), 3 * size_of(f32))
+	gl.VertexAttribPointer(0, 2, gl.FLOAT, false, 4 * size_of(f32), 0)
+	gl.VertexAttribPointer(1, 2, gl.FLOAT, false, 4 * size_of(f32), 2 * size_of(f32))
 
-	vertShader := core.resource_load("sky_vert", "basalt/assets/shaders/sky_vert.glsl")
-	fragShader := core.resource_load("sky_frag", "basalt/assets/shaders/sky_frag.glsl")
+	vertShader := core.resource_load("sun_vert", "basalt/assets/shaders/sun_vert.glsl")
+	fragShader := core.resource_load("sun_frag", "basalt/assets/shaders/sun_frag.glsl")
 
 	shaderSuccess: bool
 	render.program, shaderSuccess = gl.load_shaders_source(core.resource_string(vertShader), core.resource_string(fragShader))
@@ -95,19 +160,13 @@ setup :: proc(core: ^skeewb.core_interface, camera: ^util.Camera, render: ^Rende
 	render.uniforms = gl.get_uniforms_from_program(render.program)
 }
 
-dayTime: f32 = 1200
-skyBlue := vec3{0.4666, 0.6588, 1.0}
-fogBlue := vec3{0.6666, 0.8156, 0.9921};
-skyColor := skyBlue
-fogColor := fogBlue
-
-draw :: proc(camera: ^util.Camera, render: Render, time: f32) {
+drawSun :: proc(camera: ^util.Camera, render: Render, time: f32) {
 	cycle := math.fract(time / dayTime)
 	angle := 2 * math.PI * cycle
 	brightness := clamp(math.cos(angle) * 2 + 0.5, 0, 1)
 	skyColor = vec3{brightness * skyBlue.r, brightness * skyBlue.g, brightness * skyBlue.b}
 	fogColor = vec3{brightness * fogBlue.r, brightness * fogBlue.g, brightness * fogBlue.b}
-    sunDirection = math.normalize(vec3{math.sin(angle), math.cos(angle) * math.sin(f32(math.RAD_PER_DEG) * 30), math.cos(angle) * math.cos(f32(math.RAD_PER_DEG) * 30)})
+    sunDirection = math.normalize(vec3{math.sin(angle), math.cos(angle) * math.sin(f32(math.RAD_PER_DEG) * 75), math.cos(angle) * math.cos(f32(math.RAD_PER_DEG) * 75)})
     pos := sunDirection * 1000
     right := math.normalize(math.cross(vec3{0, 1, 0}, sunDirection))
     up := math.normalize(math.cross(sunDirection, right))

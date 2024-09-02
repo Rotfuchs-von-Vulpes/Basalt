@@ -51,6 +51,7 @@ playerCamera := util.Camera{
 blockRender := worldRender.Render{{}, 0, 0}
 fboRender := frameBuffer.Render{0, 0, 0, {}, 0, 0, 0}
 skyRender := sky.Render{0, 0, {}, 0, 0}
+sunRender := sky.Render{0, 0, {}, 0, 0}
 
 chunks: [dynamic]worldRender.ChunkBuffer
 allChunks: [dynamic]worldRender.ChunkBuffer
@@ -124,6 +125,7 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	frameBuffer.setup(core, &playerCamera, &fboRender)
 
 	sky.setup(core, &playerCamera, &skyRender)
+	sky.setupSun(core, &playerCamera, &sunRender)
 
 	chunks = worldRender.frustumCulling(allChunks, &playerCamera)
 }
@@ -154,7 +156,7 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	context.allocator = mem.tracking_allocator(tracking_allocator)
 	
 	duration := time.tick_since(start_tick)
-	seconds := f32(time.duration_seconds(duration))
+	deltaTime := f32(time.duration_milliseconds(duration))
 
 	event: sdl2.Event
 		
@@ -299,17 +301,18 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	if moved {reloadChunks()}
 
 	gl.BindFramebuffer(gl.FRAMEBUFFER, fboRender.id)
-	gl.Enable(gl.DEPTH_TEST)
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
 	gl.UseProgram(skyRender.program)
-	sky.draw(&playerCamera, skyRender, seconds)
+	sky.draw(&playerCamera, skyRender, deltaTime)
+	gl.UseProgram(sunRender.program)
+	sky.drawSun(&playerCamera, sunRender, deltaTime)
+	gl.Enable(gl.DEPTH_TEST)
 	gl.UseProgram(blockRender.program)
 	worldRender.drawChunks(chunks, &playerCamera, blockRender)
 	
 	gl.UseProgram(fboRender.program)
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-	gl.UniformMatrix4fv(fboRender.uniforms["view"].location, 1, false, &playerCamera.view[0, 0])
 	frameBuffer.draw(fboRender)
 
 	sdl2.GL_SwapWindow(window)
@@ -336,12 +339,17 @@ quit :: proc"c"(core: ^skeewb.core_interface){
 	for key, value in skyRender.uniforms {
 		delete(value.name)
 	}
+	for key, value in sunRender.uniforms {
+		delete(value.name)
+	}
 	delete(blockRender.uniforms)
 	delete(fboRender.uniforms)
 	delete(skyRender.uniforms)
+	delete(sunRender.uniforms)
 	gl.DeleteProgram(blockRender.program)
 	gl.DeleteProgram(fboRender.program)
 	gl.DeleteProgram(skyRender.program)
+	gl.DeleteProgram(sunRender.program)
 	gl.DeleteFramebuffers(1, &fboRender.id)
 	for &chunk in chunks {
 		gl.DeleteBuffers(1, &chunk.VBO)
