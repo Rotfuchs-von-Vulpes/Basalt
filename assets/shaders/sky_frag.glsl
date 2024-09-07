@@ -11,10 +11,7 @@ void main()
 {
     vec3 direction = normalize(Pos);
 
-    //vec3 sky = vec3(1);
-    //if (length(direction - vec3(0, 0, 1)) < 0.5) sky = vec3(0);
-    //sky = vec3(direction.x, direction.y, direction.z);
-    vec3 sky = mix(skyColor, fogColor, clamp(length(direction - vec3(0, 1, 0)) - 0.5, 0.0, 1.0));
+    vec3 sky = mix(skyColor, fogColor, clamp(length(2.0 * direction - vec3(0, 1, 0)) - 1.0, 0.0, 1.0));
 
     fragColor = vec4(sky, 1.0);
 }

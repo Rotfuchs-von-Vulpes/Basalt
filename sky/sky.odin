@@ -81,20 +81,16 @@ draw :: proc(camera: ^util.Camera, render: Render, time: f32) {
 	fogColor = fogBlue
 	skyColor *= brightness
 	fogColor *= brightness
-    // sunDirection = math.normalize(vec3{math.sin(angle), math.cos(angle) * math.sin(f32(math.RAD_PER_DEG) * 75), math.cos(angle) * math.cos(f32(math.RAD_PER_DEG) * 75)})
-    // right := math.normalize(math.cross(vec3{0, 1, 0}, sunDirection))
-    // up := math.normalize(math.cross(sunDirection, right))
     pos := camera.front
 	model := 
-	math.matrix4_translate_f32(pos) * 
-	math.matrix4_rotate_f32(0.5 * math.PI - math.atan2(math.length(pos.xz), pos.y), -math.normalize(math.cross(vec3{0, 1, 0}, camera.front))) * 
-	math.matrix4_rotate_f32(-0.5 * math.PI - math.atan2(pos.z, pos.x), {0, 1, 0}) * 
-	math.matrix4_scale(vec3{1, camera.viewPort.y / camera.viewPort.x, 0})
+		math.matrix4_translate_f32(pos) * 
+		math.matrix4_rotate_f32(0.5 * math.PI - math.atan2(math.length(pos.xz), pos.y), -math.normalize(math.cross(vec3{0, 1, 0}, camera.front))) * 
+		math.matrix4_rotate_f32(-0.5 * math.PI - math.atan2(pos.z, pos.x), {0, 1, 0}) * 
+		math.matrix4_scale(vec3{1, camera.viewPort.y / camera.viewPort.x, 0})
     gl.UniformMatrix4fv(render.uniforms["model"].location, 1, false, &model[0, 0])
 	gl.UniformMatrix4fv(render.uniforms["projection"].location, 1, false, &camera.proj[0, 0])
 	gl.UniformMatrix4fv(render.uniforms["view"].location, 1, false, &camera.view[0, 0])
 	gl.Uniform1f(render.uniforms["ratio"].location, camera.viewPort.y / camera.viewPort.x)
-	//gl.Uniform3f(render.uniforms["sunDirection"].location, sunDirection.x, sunDirection.y, sunDirection.z)
 	gl.Uniform3f(render.uniforms["skyColor"].location, skyColor.r, skyColor.g, skyColor.b)
 	gl.Uniform3f(render.uniforms["fogColor"].location, fogColor.r, fogColor.g, fogColor.b)
 
