@@ -44,7 +44,7 @@ playerCamera := util.Camera{
 	{0, 1, 0}, 
 	{1, 0, 0}, 
 	{0, 0, 0}, 6, 
-	{f32(screenWidth), f32(screenHeight)}, 
+	{4 * f32(screenWidth), 4 * f32(screenHeight)}, 
 	math.MATRIX4F32_IDENTITY, math.MATRIX4F32_IDENTITY
 }
 
@@ -105,6 +105,7 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	gl.Enable(gl.DEPTH_TEST)
 	gl.Enable(gl.CULL_FACE)
 	gl.CullFace(gl.BACK)
+	gl.Viewport(0, 0, i32(playerCamera.viewPort.x / 2), i32(playerCamera.viewPort.y / 2))
 
 	// gl.Enable(gl.BLEND)
 	// gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
