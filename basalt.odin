@@ -154,7 +154,11 @@ reloadChunks :: proc() {
 	chunks = worldRender.frustumCulling(allChunks, &playerCamera)
 }
 
+last: time.Tick
+cameraSpeed: f32 = 0.25
+
 loop :: proc"c"(core: ^skeewb.core_interface) {
+	last = time.tick_now()
 	context = runtime.default_context()
 	context.allocator = mem.tracking_allocator(tracking_allocator)
 	
@@ -254,7 +258,6 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 		}
 	}
 
-	cameraSpeed: f32 = 0.125
 	scale: [3]f32 = {0, 0, 0}
 
 	if toFront != toBehind {
@@ -274,11 +277,12 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	}
 
 	if scale.x != 0 || scale.y != 0 || scale.z != 0 {
-		scale = math.vector_normalize(scale) * cameraSpeed
+		scale = math.vector_normalize(scale) * cameraSpeed * f32(time.duration_milliseconds(time.tick_since(last)))
 		playerCamera.pos += scale;
 		if chunks != nil {delete(chunks)}
 		chunks = worldRender.frustumCulling(allChunks, &playerCamera)
 	}
+	last = time.tick_now()
 	
 	chunkX := i32(math.floor(playerCamera.pos.x / 32))
 	chunkY := i32(math.floor(playerCamera.pos.y / 32))
