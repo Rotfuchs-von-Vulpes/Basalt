@@ -5,6 +5,7 @@ in vec3 Pos;
 in vec3 Normal;
 in vec2 TexCoords;
 in float Occlusion;
+flat in int TextureID;
 
 uniform sampler2DArray textures;
 uniform vec3 sunDirection;
@@ -73,8 +74,7 @@ vec3 ACESFilm(vec3 rgb) {
 
 void main()
 {
-    int id = Normal.y > 0 ? 4 : Normal.y < 0 ? 2 : 3;
-    vec4 albedo = texture(textures,vec3(TexCoords, id));
+    vec4 albedo = texture(textures,vec3(TexCoords, TextureID));
     float occluse = 0.25 * Occlusion + 0.25;
     albedo.rgb = pow(ACESFilm(albedo.rgb), vec3(1.0 / 2.2)) * occluse;
 

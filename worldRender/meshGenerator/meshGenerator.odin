@@ -51,7 +51,7 @@ Point :: struct {
 Face :: struct {
     pos: BlockPos,
     direction: Direction,
-    textureID: u32,
+    textureID: f32,
     orientation: Orientation,
     corners: [Corner]Point,
 }
@@ -299,16 +299,28 @@ getFacePoints :: proc(cube: CubeFacesPoints, primers: Primers, direction: Direct
     panic("Alert, bit flip by cosmic rays detect.")
 }
 
+getTextureID :: proc(dir: Direction, id: u32) -> f32 {
+    if id == 1 {return 1}
+    if id == 2 {return 2}
+    if id == 3 {
+        if dir == .Up {return 4}
+        if dir == .Bottom {return 2}
+        return 3
+    }
+
+    return 0
+}
+
 makePoinsAndFaces :: proc(cubesPoints: [dynamic]CubeFacesPoints, primers: Primers) -> [dynamic]Face {
     faces := [dynamic]Face{}
 
     for cube in cubesPoints {
-        if .Up     in cube.faces {append(&faces, Face{cube.pos, .Up,     cube.id, .Up, getFacePoints(cube, primers, .Up,    )})}
-        if .Bottom in cube.faces {append(&faces, Face{cube.pos, .Bottom, cube.id, .Up, getFacePoints(cube, primers, .Bottom,)})}
-        if .North  in cube.faces {append(&faces, Face{cube.pos, .North,  cube.id, .Up, getFacePoints(cube, primers, .North, )})}
-        if .South  in cube.faces {append(&faces, Face{cube.pos, .South,  cube.id, .Up, getFacePoints(cube, primers, .South, )})}
-        if .East   in cube.faces {append(&faces, Face{cube.pos, .East,   cube.id, .Up, getFacePoints(cube, primers, .East,  )})}
-        if .West   in cube.faces {append(&faces, Face{cube.pos, .West,   cube.id, .Up, getFacePoints(cube, primers, .West,  )})}
+        if .Up     in cube.faces {append(&faces, Face{cube.pos, .Up,     getTextureID(.Up,     cube.id), .Up, getFacePoints(cube, primers, .Up    )})}
+        if .Bottom in cube.faces {append(&faces, Face{cube.pos, .Bottom, getTextureID(.Bottom, cube.id), .Up, getFacePoints(cube, primers, .Bottom)})}
+        if .North  in cube.faces {append(&faces, Face{cube.pos, .North,  getTextureID(.North,  cube.id), .Up, getFacePoints(cube, primers, .North )})}
+        if .South  in cube.faces {append(&faces, Face{cube.pos, .South,  getTextureID(.South,  cube.id), .Up, getFacePoints(cube, primers, .South )})}
+        if .East   in cube.faces {append(&faces, Face{cube.pos, .East,   getTextureID(.East,   cube.id), .Up, getFacePoints(cube, primers, .East  )})}
+        if .West   in cube.faces {append(&faces, Face{cube.pos, .West,   getTextureID(.West,   cube.id), .Up, getFacePoints(cube, primers, .West  )})}
     }
 
     return faces
@@ -341,12 +353,12 @@ makeVertices :: proc(faces: [dynamic]Face, primers: Primers) -> ([dynamic]u32, [
         a01 := face.corners[.BottomLeft].occlusion
         a10 := face.corners[.BottomRight].occlusion
         a11 := face.corners[.TopRight].occlusion
-        append(&vertices, ppPos.x, ppPos.y, ppPos.z, normal.x, normal.y, normal.z, 0, 0, face.corners[.TopLeft].occlusion)
-        append(&vertices, pmPos.x, pmPos.y, pmPos.z, normal.x, normal.y, normal.z, 0, 1, face.corners[.BottomLeft].occlusion)
-        append(&vertices, mmPos.x, mmPos.y, mmPos.z, normal.x, normal.y, normal.z, 1, 1, face.corners[.BottomRight].occlusion)
-        append(&vertices, mpPos.x, mpPos.y, mpPos.z, normal.x, normal.y, normal.z, 1, 0, face.corners[.TopRight].occlusion)
+        append(&vertices, ppPos.x, ppPos.y, ppPos.z, normal.x, normal.y, normal.z, 0, 0, face.corners[.TopLeft].occlusion, face.textureID)
+        append(&vertices, pmPos.x, pmPos.y, pmPos.z, normal.x, normal.y, normal.z, 0, 1, face.corners[.BottomLeft].occlusion, face.textureID)
+        append(&vertices, mmPos.x, mmPos.y, mmPos.z, normal.x, normal.y, normal.z, 1, 1, face.corners[.BottomRight].occlusion, face.textureID)
+        append(&vertices, mpPos.x, mpPos.y, mpPos.z, normal.x, normal.y, normal.z, 1, 0, face.corners[.TopRight].occlusion, face.textureID)
         toFlip := toFlipe(a01, a00, a10, a11)
-        n := u32(len(vertices) / 9)
+        n := u32(len(vertices) / 10)
         if toFlip {
             append(&indices, n - 4, n - 3, n - 2, n - 2, n - 1, n - 4)
         } else {
