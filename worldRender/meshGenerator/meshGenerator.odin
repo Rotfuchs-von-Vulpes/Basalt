@@ -331,10 +331,11 @@ toFlipe :: proc(a00, a01, a10, a11: f32) -> bool {
 	return a00 + a11 < a01 + a10;
 }
 
-makeVertices :: proc(faces: [dynamic]Face, primers: Primers) -> ([dynamic]u32, [dynamic]f32) {
-    vertices := [dynamic]f32{}
-    indices := [dynamic]u32{}
+makeVertices :: proc(faces: [dynamic]Face, primers: Primers) -> ([Direction][dynamic]u32, [Direction][dynamic]f32) {
+    vertices := [Direction][dynamic]f32{}
+    indices := [Direction][dynamic]u32{}
 
+    count: u32 = 0;
     for face in faces {
         // toFlip: bool
         normal: vec3
@@ -354,16 +355,17 @@ makeVertices :: proc(faces: [dynamic]Face, primers: Primers) -> ([dynamic]u32, [
         a01 := face.corners[.BottomLeft].occlusion
         a10 := face.corners[.BottomRight].occlusion
         a11 := face.corners[.TopRight].occlusion
-        append(&vertices, ppPos.x, ppPos.y, ppPos.z, normal.x, normal.y, normal.z, 0, 0, face.corners[.TopLeft].occlusion, face.textureID)
-        append(&vertices, pmPos.x, pmPos.y, pmPos.z, normal.x, normal.y, normal.z, 0, 1, face.corners[.BottomLeft].occlusion, face.textureID)
-        append(&vertices, mmPos.x, mmPos.y, mmPos.z, normal.x, normal.y, normal.z, 1, 1, face.corners[.BottomRight].occlusion, face.textureID)
-        append(&vertices, mpPos.x, mpPos.y, mpPos.z, normal.x, normal.y, normal.z, 1, 0, face.corners[.TopRight].occlusion, face.textureID)
+        append(&vertices[face.direction], ppPos.x, ppPos.y, ppPos.z, normal.x, normal.y, normal.z, 0, 0, face.corners[.TopLeft].occlusion, face.textureID)
+        append(&vertices[face.direction], pmPos.x, pmPos.y, pmPos.z, normal.x, normal.y, normal.z, 0, 1, face.corners[.BottomLeft].occlusion, face.textureID)
+        append(&vertices[face.direction], mmPos.x, mmPos.y, mmPos.z, normal.x, normal.y, normal.z, 1, 1, face.corners[.BottomRight].occlusion, face.textureID)
+        append(&vertices[face.direction], mpPos.x, mpPos.y, mpPos.z, normal.x, normal.y, normal.z, 1, 0, face.corners[.TopRight].occlusion, face.textureID)
         toFlip := toFlipe(a01, a00, a10, a11)
-        n := u32(len(vertices) / 10)
+        count += 4
+        n := count
         if toFlip {
-            append(&indices, n - 4, n - 3, n - 2, n - 2, n - 1, n - 4)
+            append(&indices[face.direction], n - 4, n - 3, n - 2, n - 2, n - 1, n - 4)
         } else {
-            append(&indices, n - 1, n - 4, n - 3, n - 3, n - 2, n - 1)
+            append(&indices[face.direction], n - 1, n - 4, n - 3, n - 3, n - 2, n - 1)
         }
     }
 
@@ -394,7 +396,28 @@ generateMesh :: proc(chunk: world.Chunk) -> ([dynamic]u32, [dynamic]f32) {
     faces := makePoinsAndFaces(cubesPoints, primers)
     delete(cubesPoints)
     indices, vertices := makeVertices(faces, primers)
+    defer {
+        for &arr in indices {
+            delete(arr)
+        }
+        for &arr in vertices {
+            delete(arr)
+        }
+    }
     delete(faces)
 
-    return indices, vertices
+    finalIndices: [dynamic]u32 = {}
+    finalVertices: [dynamic]f32 = {}
+    for side in indices {
+        for indice in side {
+           append(&finalIndices, indice) 
+        }
+    }
+    for side in vertices {
+        for vertice in side {
+           append(&finalVertices, vertice) 
+        }
+    }
+
+    return finalIndices, finalVertices
 }

@@ -5,7 +5,7 @@ in vec3 Pos;
 in vec3 Normal;
 in vec2 TexCoords;
 in float Occlusion;
-flat in int TextureID;
+in float TextureID;
 
 uniform sampler2DArray textures;
 uniform vec3 sunDirection;

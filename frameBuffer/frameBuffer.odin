@@ -98,8 +98,8 @@ draw :: proc(render: Render) {
 	gl.BindVertexArray(render.vao)
 	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, render.texture)
-	gl.ActiveTexture(gl.TEXTURE1)
-	gl.BindTexture(gl.TEXTURE_2D, render.depth)
+	// gl.ActiveTexture(gl.TEXTURE1)
+	// gl.BindTexture(gl.TEXTURE_2D, render.depth)
 
 	//gl.Uniform1i(render.uniforms["depthTexture"].location, 1)
 	gl.DrawArrays(gl.TRIANGLES, 0, 6)

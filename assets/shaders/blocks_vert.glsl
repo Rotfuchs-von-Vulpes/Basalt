@@ -10,7 +10,7 @@ out vec3 Pos;
 out vec3 Normal;
 out vec2 TexCoords;
 out float Occlusion;
-out int TextureID;
+out float TextureID;
 
 uniform mat4 model;
 uniform mat4 view;
@@ -22,6 +22,6 @@ void main() {
     Normal = aNormal;
     TexCoords = aTexCoords;
     Occlusion = aOcclusion;
-    TextureID = int(aTextureID);
+    TextureID = aTextureID;
 	gl_Position = projection * view * vec4(FragPos, 1.0);
 }

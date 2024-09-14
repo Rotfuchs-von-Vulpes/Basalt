@@ -100,7 +100,7 @@ setupDrawing :: proc(core: ^skeewb.core_interface, render: ^Render) {
         skeewb.console_log(.ERROR, "could not compile blocks shaders\n %s\n %s", a, c)
     }
 
-	gl.UseProgram(render.program)
+	//gl.UseProgram(render.program)
 
 	gl.GenTextures(1, &render.texture)
 	gl.BindTexture(gl.TEXTURE_2D_ARRAY, render.texture)
@@ -130,6 +130,7 @@ setupDrawing :: proc(core: ^skeewb.core_interface, render: ^Render) {
 		gl.GetFloatv(gl.MAX_TEXTURE_MAX_ANISOTROPY, &filter)
 		gl.TexParameterf(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAX_ANISOTROPY, filter)
 	}
+	render.uniforms = gl.get_uniforms_from_program(render.program)
 }
 
 testAabb :: proc(MPV: mat4, min, max: vec3) -> bool
