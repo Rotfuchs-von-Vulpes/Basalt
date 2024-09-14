@@ -89,12 +89,20 @@ getNewChunk :: proc(x, y, z: i32, heightMap: HeightMap) -> Chunk {
         for j in 0..<32 {
             height := int(heightMap[i][j])
             for k in 0..<height {
-                if height - k == 1 {
-                    primer[i][k][j] = 3
-                } else if height - k < 4 {
-                    primer[i][k][j] = 2
+                if height > 15 {
+                    if height - k == 1 {
+                        primer[i][k][j] = 3
+                    } else if height - k < 4 {
+                        primer[i][k][j] = 2
+                    } else {
+                        primer[i][k][j] = 1
+                    }
                 } else {
-                    primer[i][k][j] = 1
+                    if height - k == 1 {
+                        primer[i][k][j] = 4
+                    } else {
+                        primer[i][k][j] = 1
+                    }
                 }
             }
         }

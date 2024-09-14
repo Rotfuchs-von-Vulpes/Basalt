@@ -307,6 +307,7 @@ getTextureID :: proc(dir: Direction, id: u32) -> f32 {
         if dir == .Bottom {return 2}
         return 3
     }
+    if id == 4 {return 5}
 
     return 0
 }
