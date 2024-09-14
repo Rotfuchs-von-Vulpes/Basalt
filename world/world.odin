@@ -57,8 +57,12 @@ erode :: proc(n: f32) -> f32 {
     return math.clamp(n, 0, 1)
 }
 
+flooding :: proc(n: f32) -> f32 {
+    return n > 0.5 ? n : math.clamp(pow(2 * n, 9), 0.1, 0.5)
+}
+
 mix :: proc(continent, eroding, peaking: f32) -> f32 {
-    return continent < 0.5 ? continent : continent + erode(eroding) * peake(peaking);
+    return continent < 0.5 ? flooding(continent) : continent + erode(eroding) * peake(peaking);
 }
 
 getNoised :: proc(n: Noise, x, z: f64) -> f32 {
