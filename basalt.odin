@@ -1,6 +1,7 @@
 package basalt
 
 import "core:fmt"
+import "core:strings"
 import "core:time"
 import "core:mem"
 import math "core:math/linalg"
@@ -30,6 +31,10 @@ load :: proc"c"(core: ^skeewb.core_interface) -> skeewb.module_desc {
 		interface = nil,
 	}
 }
+
+lastTimeTicks := time.tick_now()
+nbFrames := 0
+fps := 0
 
 start_tick: time.Tick
 
@@ -98,7 +103,7 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	}
 	skeewb.console_log(.INFO, "successfully created an OpenGL context")
 
-	sdl2.GL_SetSwapInterval(-1)
+	//sdl2.GL_SetSwapInterval(-1)
 
 	gl.load_up_to(3, 3, sdl2.gl_set_proc_address)
 	
@@ -317,6 +322,14 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	frameBuffer.draw(fboRender)
 
 	sdl2.GL_SwapWindow(window)
+	
+	nbFrames += 1
+	if time.duration_seconds(time.tick_since(lastTimeTicks)) >= 1.0 {
+		fps = nbFrames
+		nbFrames = 0
+		lastTimeTicks = time.tick_now()
+	}
+	sdl2.SetWindowTitle(window, strings.unsafe_string_to_cstring(fmt.tprintfln("FPS: %d", fps)))
 }
 
 quit :: proc"c"(core: ^skeewb.core_interface){
