@@ -49,7 +49,7 @@ playerCamera := util.Camera{
 	{0, 1, 0}, 
 	{1, 0, 0}, 
 	{0, 0, 0}, 6, 
-	{4 * f32(screenWidth), 4 * f32(screenHeight)}, 
+	{2 * f32(screenWidth), 2 * f32(screenHeight)}, 
 	math.MATRIX4F32_IDENTITY, math.MATRIX4F32_IDENTITY
 }
 
@@ -103,14 +103,13 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	}
 	skeewb.console_log(.INFO, "successfully created an OpenGL context")
 
-	//sdl2.GL_SetSwapInterval(-1)
+	sdl2.GL_SetSwapInterval(0)
 
 	gl.load_up_to(3, 3, sdl2.gl_set_proc_address)
 	
 	gl.Enable(gl.DEPTH_TEST)
 	gl.Enable(gl.CULL_FACE)
 	gl.CullFace(gl.BACK)
-	gl.Viewport(0, 0, i32(playerCamera.viewPort.x / 2), i32(playerCamera.viewPort.y / 2))
 
 	// gl.Enable(gl.BLEND)
 	// gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
@@ -122,8 +121,6 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	// allChunks = worldRender.setupManyChunks(tmp)
 
 	gl.ClearColor(0.4666, 0.6588, 1.0, 1.0)
-
-	blockRender.uniforms = gl.get_uniforms_from_program(blockRender.program)
 
 	playerCamera.proj = math.matrix4_infinite_perspective_f32(45, playerCamera.viewPort.x / playerCamera.viewPort.y, 0.1)
 	playerCamera.view = math.matrix4_look_at_f32({0, 0, 0}, playerCamera.front, playerCamera.up)
@@ -306,9 +303,11 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 
 	if moved {reloadChunks()}
 
+	gl.UseProgram(fboRender.program)
 	gl.BindFramebuffer(gl.FRAMEBUFFER, fboRender.id)
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
+	gl.Viewport(0, 0, i32(playerCamera.viewPort.x), i32(playerCamera.viewPort.y))
 	gl.UseProgram(skyRender.program)
 	sky.draw(&playerCamera, skyRender, deltaTime)
 	gl.UseProgram(sunRender.program)
@@ -317,6 +316,7 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	gl.UseProgram(blockRender.program)
 	worldRender.drawChunks(chunks, &playerCamera, blockRender)
 	
+	gl.Viewport(0, 0, i32(playerCamera.viewPort.x / 2), i32(playerCamera.viewPort.y / 2))
 	gl.UseProgram(fboRender.program)
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 	frameBuffer.draw(fboRender)
