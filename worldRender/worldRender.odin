@@ -149,25 +149,30 @@ testAabb :: proc(MPV: mat4, min, max: vec3) -> bool
 		pzX * (pzX < 0 ? min[0] : max[0]) + pzY * (pzY < 0 ? min[1] : max[1]) + pzZ * (pzZ < 0 ? min[2] : max[2]) >= -pzW;
 }
 
+frustumMove :: proc(chunks: ^[dynamic]ChunkBuffer, camera: ^util.Camera) {
+	for &chunk in chunks {
+		faces: mesh.FaceSet = {}
+
+		if chunk.x <= camera.chunk.x {faces = faces + {.East}}
+		if chunk.x >= camera.chunk.x {faces = faces + {.West}}
+		if chunk.y <= camera.chunk.y {faces = faces + {.Up}}
+		if chunk.y >= camera.chunk.y {faces = faces + {.Bottom}}
+		if chunk.z <= camera.chunk.z {faces = faces + {.North}}
+		if chunk.z >= camera.chunk.z {faces = faces + {.South}}
+
+		chunk.faceSet = faces
+	}
+}
+
 frustumCulling :: proc(chunks: [dynamic]ChunkBuffer, camera: ^util.Camera) -> [dynamic]ChunkBuffer {
-	chunksBuffers: [dynamic]ChunkBuffer
+	chunksBuffers: [dynamic]ChunkBuffer = {}
 
 	PV := camera.proj * camera.view
-	for &chunk in chunks {
+	for chunk in chunks {
 		minC := 32 * vec3{f32(chunk.x), f32(chunk.y), f32(chunk.z)} - camera.pos
 		maxC := minC + vec3{32, 32, 32}
 		
-		if testAabb(PV, minC, maxC) {
-			faces: mesh.FaceSet = {}
-			if chunk.x <= camera.chunk.x {faces = faces + {.East}}
-			if chunk.x >= camera.chunk.x {faces = faces + {.West}}
-			if chunk.y <= camera.chunk.y {faces = faces + {.Up}}
-			if chunk.y >= camera.chunk.y {faces = faces + {.Bottom}}
-			if chunk.z <= camera.chunk.z {faces = faces + {.North}}
-			if chunk.z >= camera.chunk.z {faces = faces + {.South}}
-			chunk.faceSet = faces
-			append(&chunksBuffers, chunk)
-		}
+		if testAabb(PV, minC, maxC) {append(&chunksBuffers, chunk)}
 	}
 
 	return chunksBuffers

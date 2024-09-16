@@ -130,6 +130,7 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	sky.setup(core, &playerCamera, &skyRender)
 	sky.setupSun(core, &playerCamera, &sunRender)
 
+	worldRender.frustumMove(&allChunks, &playerCamera)
 	chunks = worldRender.frustumCulling(allChunks, &playerCamera)
 }
 
@@ -151,6 +152,7 @@ reloadChunks :: proc() {
 	tmp := world.peak(playerCamera.chunk.x, playerCamera.chunk.y, playerCamera.chunk.z, playerCamera.viewDistance)
 	defer delete(tmp)
 	allChunks = worldRender.setupManyChunks(tmp)
+	worldRender.frustumMove(&allChunks, &playerCamera)
 	chunks = worldRender.frustumCulling(allChunks, &playerCamera)
 }
 
