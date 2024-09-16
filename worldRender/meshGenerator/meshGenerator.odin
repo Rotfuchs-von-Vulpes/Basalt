@@ -9,6 +9,7 @@ Pos :: [3]i8
 
 BlockPos :: [3]u8
 
+ivec2 :: [2]u32
 vec3 :: [3]f32
 
 Direction :: enum {Up, Bottom, North, South, East, West}
@@ -331,8 +332,8 @@ toFlipe :: proc(a00, a01, a10, a11: f32) -> bool {
 	return a00 + a11 < a01 + a10;
 }
 
-makeVertices :: proc(faces: [dynamic]Face, primers: Primers) -> ([Direction][dynamic]u32, [Direction][dynamic]f32) {
-    vertices := [Direction][dynamic]f32{}
+makeVertices :: proc(faces: [dynamic]Face, primers: Primers) -> ([Direction][dynamic]u32, [dynamic]f32) {
+    vertices := [dynamic]f32{}
     indices := [Direction][dynamic]u32{}
 
     count: u32 = 0;
@@ -355,13 +356,14 @@ makeVertices :: proc(faces: [dynamic]Face, primers: Primers) -> ([Direction][dyn
         a01 := face.corners[.BottomLeft].occlusion
         a10 := face.corners[.BottomRight].occlusion
         a11 := face.corners[.TopRight].occlusion
-        append(&vertices[face.direction], ppPos.x, ppPos.y, ppPos.z, normal.x, normal.y, normal.z, 0, 0, face.corners[.TopLeft].occlusion, face.textureID)
-        append(&vertices[face.direction], pmPos.x, pmPos.y, pmPos.z, normal.x, normal.y, normal.z, 0, 1, face.corners[.BottomLeft].occlusion, face.textureID)
-        append(&vertices[face.direction], mmPos.x, mmPos.y, mmPos.z, normal.x, normal.y, normal.z, 1, 1, face.corners[.BottomRight].occlusion, face.textureID)
-        append(&vertices[face.direction], mpPos.x, mpPos.y, mpPos.z, normal.x, normal.y, normal.z, 1, 0, face.corners[.TopRight].occlusion, face.textureID)
+        append(&vertices, ppPos.x, ppPos.y, ppPos.z, normal.x, normal.y, normal.z, 0, 0, face.corners[.TopLeft].occlusion,     face.textureID)
+        append(&vertices, pmPos.x, pmPos.y, pmPos.z, normal.x, normal.y, normal.z, 0, 1, face.corners[.BottomLeft].occlusion,  face.textureID)
+        append(&vertices, mmPos.x, mmPos.y, mmPos.z, normal.x, normal.y, normal.z, 1, 1, face.corners[.BottomRight].occlusion, face.textureID)
+        append(&vertices, mpPos.x, mpPos.y, mpPos.z, normal.x, normal.y, normal.z, 1, 0, face.corners[.TopRight].occlusion,    face.textureID)
         toFlip := toFlipe(a01, a00, a10, a11)
-        count += 4
-        n := count
+        //count += 4
+        n := u32(len(vertices)) / 10
+        //skeewb.console_log(.INFO, "%d", face.direction)
         if toFlip {
             append(&indices[face.direction], n - 4, n - 3, n - 2, n - 2, n - 1, n - 4)
         } else {
@@ -372,7 +374,7 @@ makeVertices :: proc(faces: [dynamic]Face, primers: Primers) -> ([Direction][dyn
     return indices, vertices
 }
 
-generateMesh :: proc(chunk: world.Chunk) -> ([dynamic]u32, [dynamic]f32) {
+generateMesh :: proc(chunk: world.Chunk) -> ([Direction]ivec2, [dynamic]u32, [dynamic]f32) {
     x := chunk.pos.x
     y := chunk.pos.y
     z := chunk.pos.z
@@ -400,24 +402,21 @@ generateMesh :: proc(chunk: world.Chunk) -> ([dynamic]u32, [dynamic]f32) {
         for &arr in indices {
             delete(arr)
         }
-        for &arr in vertices {
-            delete(arr)
-        }
     }
     delete(faces)
 
     finalIndices: [dynamic]u32 = {}
-    finalVertices: [dynamic]f32 = {}
-    for side in indices {
+    ranges: [Direction]ivec2 = {}
+    count: u32 = 0;
+    for side, dir in indices {
+        ranges[dir][0] = count
         for indice in side {
-           append(&finalIndices, indice) 
+           append(&finalIndices, indice)
+           //skeewb.console_log(.INFO, "%d", indice)
+           count += 1
         }
-    }
-    for side in vertices {
-        for vertice in side {
-           append(&finalVertices, vertice) 
-        }
+        ranges[dir][1] = count
     }
 
-    return finalIndices, finalVertices
+    return ranges, finalIndices, vertices
 }

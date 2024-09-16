@@ -13,14 +13,15 @@ import "../util"
 import "../sky"
 import mesh "meshGenerator"
 
+iVec3 :: [3]i32
+ivec2 :: [2]u32
+
 ChunkBuffer :: struct{
     x, y, z: i32,
 	VAO, VBO, EBO: u32,
-    length: i32
-}
-
-iVec3 :: struct {
-    x, y, z: i32
+    length: i32,
+	faceSet: mesh.FaceSet,
+	ranges: [mesh.Direction]ivec2,
 }
 
 mat4 :: glm.mat4x4
@@ -31,7 +32,7 @@ vec4 :: [4]f32
 chunkMap := make(map[iVec3]ChunkBuffer)
 
 setupChunk :: proc(chunk: world.Chunk) -> ChunkBuffer {
-    indices, vertices := mesh.generateMesh(chunk)
+    ranges, indices, vertices := mesh.generateMesh(chunk)
     defer delete(indices)
     defer delete(vertices)
     VAO, VBO, EBO: u32
@@ -58,7 +59,7 @@ setupChunk :: proc(chunk: world.Chunk) -> ChunkBuffer {
 	gl.VertexAttribPointer(3, 1, gl.FLOAT, false, 10 * size_of(f32), 8 * size_of(f32))
 	gl.VertexAttribPointer(4, 1, gl.FLOAT, false, 10 * size_of(f32), 9 * size_of(f32))
 
-    return ChunkBuffer{chunk.pos.x, chunk.pos.y, chunk.pos.z, VAO, VBO, EBO, i32(len(indices))}
+    return ChunkBuffer{chunk.pos.x, chunk.pos.y, chunk.pos.z, VAO, VBO, EBO, i32(len(indices)), {}, ranges}
 }
 
 eval :: proc(chunk: world.Chunk) -> ChunkBuffer {
@@ -99,8 +100,6 @@ setupDrawing :: proc(core: ^skeewb.core_interface, render: ^Render) {
         a, b, c, d := gl.get_last_error_messages()
         skeewb.console_log(.ERROR, "could not compile blocks shaders\n %s\n %s", a, c)
     }
-
-	//gl.UseProgram(render.program)
 
 	gl.GenTextures(1, &render.texture)
 	gl.BindTexture(gl.TEXTURE_2D_ARRAY, render.texture)
@@ -154,11 +153,21 @@ frustumCulling :: proc(chunks: [dynamic]ChunkBuffer, camera: ^util.Camera) -> [d
 	chunksBuffers: [dynamic]ChunkBuffer
 
 	PV := camera.proj * camera.view
-	for chunk in chunks {
+	for &chunk in chunks {
 		minC := 32 * vec3{f32(chunk.x), f32(chunk.y), f32(chunk.z)} - camera.pos
 		maxC := minC + vec3{32, 32, 32}
 		
-		if testAabb(PV, minC, maxC) {append(&chunksBuffers, chunk)}
+		if testAabb(PV, minC, maxC) {
+			faces: mesh.FaceSet = {}
+			if chunk.x <= camera.chunk.x {faces = faces + {.East}}
+			if chunk.x >= camera.chunk.x {faces = faces + {.West}}
+			if chunk.y <= camera.chunk.y {faces = faces + {.Up}}
+			if chunk.y >= camera.chunk.y {faces = faces + {.Bottom}}
+			if chunk.z <= camera.chunk.z {faces = faces + {.North}}
+			if chunk.z >= camera.chunk.z {faces = faces + {.South}}
+			chunk.faceSet = faces
+			append(&chunksBuffers, chunk)
+		}
 	}
 
 	return chunksBuffers
@@ -176,7 +185,36 @@ drawChunks :: proc(chunks: [dynamic]ChunkBuffer, camera: ^util.Camera, render: R
 		gl.UniformMatrix4fv(render.uniforms["model"].location, 1, false, &model[0, 0])
 
 		gl.BindVertexArray(chunk.VAO)
-		gl.DrawElements(gl.TRIANGLES, chunk.length, gl.UNSIGNED_INT, nil)
+		if .North in chunk.faceSet {
+			start := chunk.ranges[.North][0]
+			end := chunk.ranges[.North][1]
+			gl.DrawElements(gl.TRIANGLES, i32(end - start), gl.UNSIGNED_INT, (rawptr)(uintptr(start) * size_of(u32)))
+		}
+		if .South in chunk.faceSet {
+			start := chunk.ranges[.South][0]
+			end := chunk.ranges[.South][1]
+			gl.DrawElements(gl.TRIANGLES, i32(end - start), gl.UNSIGNED_INT, (rawptr)(uintptr(start) * size_of(u32)))
+		}
+		if .East in chunk.faceSet {
+			start := chunk.ranges[.East][0]
+			end := chunk.ranges[.East][1]
+			gl.DrawElements(gl.TRIANGLES, i32(end - start), gl.UNSIGNED_INT, (rawptr)(uintptr(start) * size_of(u32)))
+		}
+		if .West in chunk.faceSet {
+			start := chunk.ranges[.West][0]
+			end := chunk.ranges[.West][1]
+			gl.DrawElements(gl.TRIANGLES, i32(end - start), gl.UNSIGNED_INT, (rawptr)(uintptr(start) * size_of(u32)))
+		}
+		if .Up in chunk.faceSet {
+			start := chunk.ranges[.Up][0]
+			end := chunk.ranges[.Up][1]
+			gl.DrawElements(gl.TRIANGLES, i32(end - start), gl.UNSIGNED_INT, (rawptr)(uintptr(start) * size_of(u32)))
+		}
+		if .Bottom in chunk.faceSet {
+			start := chunk.ranges[.Bottom][0]
+			end := chunk.ranges[.Bottom][1]
+			gl.DrawElements(gl.TRIANGLES, i32(end - start), gl.UNSIGNED_INT, (rawptr)(uintptr(start) * size_of(u32)))
+		}
 	}
 }
 
