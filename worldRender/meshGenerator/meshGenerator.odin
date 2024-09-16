@@ -3,7 +3,7 @@ package meshGenerator
 import "../../skeewb"
 import "../../world"
 
-Primers :: [3 * 3 * 3]^world.Chunk
+Primers :: [3][3][3]^world.Chunk
 
 Pos :: [3]i8
 
@@ -103,9 +103,8 @@ isSideExposed :: proc(primers: Primers, pos: BlockPos, offset: Pos) -> bool {
     }
 
     sidePos = BlockPos{u8(i8(sidePos.x) + x), u8(i8(sidePos.y) + y), u8(i8(sidePos.z) + z)}
-    idx := (chunkYOffset + 1) * 3 * 3 + (chunkXOffset + 1) * 3 + chunkZOffset + 1
-    if primers[idx] == nil {return false}
-    return primers[idx].primer[sidePos.x][sidePos.y][sidePos.z] == 0;
+    if primers[chunkXOffset + 1][chunkYOffset + 1][chunkZOffset + 1] == nil {return false}
+    return primers[chunkXOffset + 1][chunkYOffset + 1][chunkZOffset + 1].primer[sidePos.x][sidePos.y][sidePos.z] == 0;
 }
 
 hasSideExposed :: proc(primers: Primers, pos: BlockPos) -> bool {
@@ -126,7 +125,7 @@ filterCubes :: proc(primers: Primers) -> [dynamic]Cube {
         for j in 0..< 32 {
             for k in 0..< 32 {
                 pos := BlockPos{u8(i), u8(j), u8(k)}
-                id := primers[1 * 3 * 3 + 1 * 3 + 1].primer[pos.x][pos.y][pos.z]
+                id := primers[1][1][1].primer[pos.x][pos.y][pos.z]
 
                 if id == 0 {continue}
 
@@ -211,12 +210,11 @@ getBlockPos :: proc(primers: Primers, pos: Pos) -> (^world.Chunk, BlockPos, bool
         chunkZOffset = 1
     }
 
-    idx := (chunkYOffset + 1) * 3 * 3 + (chunkXOffset + 1) * 3 + chunkZOffset + 1
-    if primers[idx] == nil {
-        return primers[1 * 3 * 3 + 1 * 3 + 1], {0, 0, 0}, false
+    if primers[chunkXOffset + 1][chunkYOffset + 1][chunkZOffset + 1] == nil {
+        return primers[1][1][1], {0, 0, 0}, false
     }
     finalPos := BlockPos{u8(sidePos.x), u8(sidePos.y), u8(sidePos.z)}
-    return primers[idx], finalPos, true
+    return primers[chunkXOffset + 1][chunkYOffset + 1][chunkZOffset + 1], finalPos, true
 }
 
 getAO :: proc(pos: BlockPos, offset: vec3, direction: Direction, primers: Primers) -> f32 {
@@ -384,8 +382,8 @@ generateMesh :: proc(chunk: world.Chunk) -> ([Direction]ivec2, [dynamic]u32, [dy
     for i: i32 = 0; i < 3; i += 1 {
         for j: i32 = 0; j < 3; j += 1 {
             for k: i32 = 0; k < 3; k += 1 {
-                pos := [3]i32{x + i - 1, y + k - 1, z + j - 1}
-                primers[k * 3 * 3 + i * 3 + j] = &world.chunkMap[pos]
+                pos := [3]i32{x + i - 1, y + j - 1, z + k - 1}
+                primers[i][j][k] = &world.chunkMap[pos]
             }
         }
     }
