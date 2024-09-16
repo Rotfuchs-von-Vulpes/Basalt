@@ -157,10 +157,9 @@ reloadChunks :: proc() {
 }
 
 last: time.Tick
-cameraSpeed: f32 = 0.25
+cameraSpeed: f32 = 0.0125
 
 loop :: proc"c"(core: ^skeewb.core_interface) {
-	last = time.tick_now()
 	context = runtime.default_context()
 	context.allocator = mem.tracking_allocator(tracking_allocator)
 	
