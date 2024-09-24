@@ -110,12 +110,16 @@ setupDrawing :: proc(core: ^skeewb.core_interface, render: ^Render) {
 
 	width, height, channels: i32
 	datas := []string{
-		core.resource_string(core.resource_load("madera", "basalt/assets/textures/default_box.png")),
-		core.resource_string(core.resource_load("preda", "basalt/assets/textures/default_stone.png")),
-		core.resource_string(core.resource_load("terra", "basalt/assets/textures/default_dirt.png")),
-		core.resource_string(core.resource_load("teratu", "basalt/assets/textures/default_dirt_with_grass.png")),
-		core.resource_string(core.resource_load("matu", "basalt/assets/textures/default_grass.png")),
-		core.resource_string(core.resource_load("area", "basalt/assets/textures/default_sand.png")),
+		core.resource_string(core.resource_load("madera", "basalt/assets/textures/box.png")),
+		core.resource_string(core.resource_load("preda", "basalt/assets/textures/stone.png")),
+		core.resource_string(core.resource_load("terra", "basalt/assets/textures/dirt.png")),
+		core.resource_string(core.resource_load("teratu", "basalt/assets/textures/dirt_with_grass.png")),
+		core.resource_string(core.resource_load("matu", "basalt/assets/textures/grass.png")),
+		core.resource_string(core.resource_load("area", "basalt/assets/textures/sand.png")),
+		core.resource_string(core.resource_load("foia", "basalt/assets/textures/leaves.png")),
+		core.resource_string(core.resource_load("arvre", "basalt/assets/textures/tree.png")),
+		core.resource_string(core.resource_load("arvre2", "basalt/assets/textures/tree_top.png")),
+		core.resource_string(core.resource_load("pread", "basalt/assets/textures/cobble.png")),
 	}
 	gl.TexImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.SRGB8_ALPHA8, 16, 16, i32(len(datas)), 0, gl.RGBA, gl.UNSIGNED_BYTE, nil)
 	for tex, idx in datas {
