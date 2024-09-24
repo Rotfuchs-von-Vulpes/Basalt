@@ -2,6 +2,7 @@ package world
 
 import "../skeewb"
 import "core:math/noise"
+import "core:math/rand"
 import "core:math"
 import "core:fmt"
 import "../util"
@@ -13,10 +14,16 @@ iVec2 :: [2]i32
 iVec3 :: [3]i32
 vec3 :: [3]f32
 
+Direction :: enum {Up, Bottom, North, South, East, West}
+FaceSet :: bit_set[Direction]
+
 Chunk :: struct {
     pos: iVec3,
     primer: Primer,
+    opened: FaceSet,
 }
+
+allOpened: FaceSet = {.Bottom, .East, .North, .South, .Up, .West}
 
 chunkMap := make(map[iVec3]Chunk)
 terrainMap := make(map[iVec3]HeightMap)
@@ -88,21 +95,42 @@ getTerrain :: proc(x, z: i32, i, j: int) -> i32 {
 
 getNewChunk :: proc(x, y, z: i32, heightMap: HeightMap) -> Chunk {
     primer := Primer{0..<32 = {0..<32 = {0..<32 = 0}}}
+
+    open: FaceSet = {}
     
     for i in 0..<32 {
         for j in 0..<32 {
             height := int(heightMap[i][j])
-            for k in 0..<height {
+            localHeight := height - int(y) * 32
+            for k in 0..<32 {
+                if k >= localHeight {
+                    if k == 0 {
+                        open += {.Bottom}
+                    } else {
+                        open += {.Up}
+                        
+                        if i == 0 {
+                            open += {.West}
+                        } else if i == 31 {
+                            open += {.East}
+                        } else if j == 0 {
+                            open += {.South}
+                        } else if j == 31 {
+                            open += {.North}
+                        }
+                    }
+                    break
+                }
                 if height > 15 {
-                    if height - k == 1 {
+                    if localHeight - k == 1 {
                         primer[i][k][j] = 3
-                    } else if height - k < 4 {
+                    } else if localHeight - k < 4 {
                         primer[i][k][j] = 2
                     } else {
                         primer[i][k][j] = 1
                     }
                 } else {
-                    if height - k == 1 {
+                    if localHeight - k == 1 {
                         primer[i][k][j] = 4
                     } else {
                         primer[i][k][j] = 1
@@ -112,45 +140,10 @@ getNewChunk :: proc(x, y, z: i32, heightMap: HeightMap) -> Chunk {
         }
     }
 
-    return Chunk{{x, y, z}, primer}
+    return Chunk{{x, y, z}, primer, open}
 }
 
-chopp :: proc(heightMap: HeightMap) -> ([dynamic]HeightMap, int) {
-    heightsMaps: [dynamic]HeightMap = {HeightMap{}}
-    init := 0
-
-    for i in 0..<32 {
-        for j in 0..<32 {
-            tmp := heightMap[i][j]
-            if tmp > 31 {
-                idx := init
-                for tmp > 31 {
-                    if len(heightsMaps) == idx + init + 1 {append(&heightsMaps, HeightMap{})}
-                    heightsMaps[idx][i][j] = 32
-                    tmp = tmp - 32
-                    idx += 1
-                }
-                heightsMaps[idx][i][j] = tmp
-            } else if tmp < 0 {
-                idx := 0
-                for tmp < 0 {
-                    init += 1
-                    if len(heightsMaps) == idx + init + 1 {inject_at(&heightsMaps, 0, HeightMap{})}
-                    heightsMaps[0][i][j] = 0
-                    tmp = tmp + 32
-                    idx += 1
-                }
-                heightsMaps[idx][i][j] = tmp
-            } else {
-                heightsMaps[0][i][j] = tmp
-            }
-        }
-    }
-
-    return heightsMaps, -init
-}
-
-createTerrain :: proc(x, z: i32) -> ([dynamic]HeightMap, int) {
+getHeightMap :: proc(x, z: i32) -> HeightMap {
     height: HeightMap
 
     for i in 0..<32 {
@@ -159,55 +152,47 @@ createTerrain :: proc(x, z: i32) -> ([dynamic]HeightMap, int) {
         }
     }
 
-    heights, init := chopp(height)
-    heightSlice[{x, z}] = {init, len(heights) - 1}
-
-    return heights, init
+    return height
 }
 
-getHeightMap :: proc(x, z: i32) -> ([dynamic]HeightMap, int) {
-    height: HeightMap
-
-    for i in 0..<32 {
-        for j in 0..<32 {
-            height[i][j] = getTerrain(x, z, i, j)
-        }
-    }
-
-    heights, init := chopp(height)
-    heightSlice[{x, z}] = {init, len(heights) - 1}
-
-    return heights, init
-}
-
-eval :: proc(x, y, z: i32) -> Chunk {
+eval :: proc(x, y, z: i32) -> (Chunk, ^Chunk) {
     pos := iVec3{x, y, z}
     chunk, ok, _ := util.map_force_get(&chunkMap, pos)
     if ok {
-        terrains, init := getHeightMap(x, z)
-        defer delete(terrains)
-        if len(terrains) >= int(y) + init {
-            chunk^ = getNewChunk(x, y, z, terrains[int(y) + init])
-        } else if y > 0 {
-            chunk^ = Chunk{{x, y, z}, Primer{0..<32 = {0..<32 = {0..<32 = 0}}}}
-        } else {
-            chunk^ = Chunk{{x, y, z}, Primer{0..<32 = {0..<32 = {0..<32 = 1}}}}
-        }
+        terrain := getHeightMap(x, z)
+        chunk^ = getNewChunk(x, y, z, terrain)
     }
-    return chunk^
+    return chunk^, chunk
 }
 
 peak :: proc(x, y, z: i32, radius: i32) -> [dynamic]Chunk {
     chunksToView := [dynamic]Chunk{}
-    radiusP := radius + 1
+    r := radius + 1
 
-    for i := -radiusP; i <= radiusP; i += 1 {
-        for j := -radiusP; j <= radiusP; j += 1 {
-            chunk := eval(x + i, 0, z + j)
-            extremes := heightSlice[{i + x, j + z}]
-            for k := extremes[0]; k <= extremes[1]; k += 1 {
-                chunk = eval(x + i, i32(k), z + j)
-                if (i != -radiusP && i != radiusP) && (j != -radiusP && j != radiusP) {append(&chunksToView, chunk)}
+    for i := -r; i <= r; i += 1 {
+        for j := -r; j <= r; j += 1 {
+            run := true
+            k := 0
+            for {
+                chunk, _ := eval(x + i, i32(k), z + j)
+                k += 1
+                if (i != -r && i != r) && (j != -r && j != r) {
+                    append(&chunksToView, chunk)
+                }
+                if .Up not_in chunk.opened {
+                    break
+                }
+            }
+            k = 0
+            for {
+                chunk, _ := eval(x + i, i32(k), z + j)
+                k -= 1
+                if (i != -r && i != r) && (j != -r && j != r) {
+                    append(&chunksToView, chunk)
+                }
+                if .Bottom not_in chunk.opened {
+                    break
+                }
             }
         }
     }
@@ -215,36 +200,21 @@ peak :: proc(x, y, z: i32, radius: i32) -> [dynamic]Chunk {
     return chunksToView
 }
 
-getPosition :: proc(pos: iVec3) -> (^Chunk, iVec3, bool) {
+getPosition :: proc(pos: iVec3) -> (^Chunk, iVec3) {
     chunkPos := iVec3{
         i32(math.floor(f32(pos.x) / 32)),
         i32(math.floor(f32(pos.y) / 32)),
         i32(math.floor(f32(pos.z) / 32))
     }
 
-    chunk, ok, _ := util.map_force_get(&chunkMap, chunkPos)
+    _, chunk := eval(chunkPos.x, chunkPos.y, chunkPos.z)
 
     iPos: iVec3
     iPos.x = pos.x %% 32
     iPos.y = pos.y %% 32
     iPos.z = pos.z %% 32
 
-    if ok {
-        if chunkPos.y < 1 {
-            chunkP := Chunk{chunkPos, Primer{0..<32 = {0..<32 = {0..<32 = 1}}}}
-            chunk^ = chunkP
-            slice := &heightSlice[{chunkPos.x, chunkPos.z}]
-            slice[0] = int(chunkPos.y)
-        } else {
-            chunkP := Chunk{chunkPos, Primer{0..<32 = {0..<32 = {0..<32 = 0}}}}
-            chunk^ = chunkP
-            slice := &heightSlice[{chunkPos.x, chunkPos.z}]
-            slice[1] = int(chunkPos.y)
-        }
-        ok = true
-    }
-
-    return chunk, iPos, !ok
+    return chunk, iPos
 }
 
 toiVec3 :: proc(vec: vec3) -> iVec3 {
@@ -269,25 +239,25 @@ raycast :: proc(origin, direction: vec3, place: bool) -> (^Chunk, iVec3, bool) {
         iPos := toiVec3(fPos)
 
         if lastBlock != iPos {
-            chunk, pos, ok = getPosition(iPos)
+            chunk, pos = getPosition(iPos)
             if ok && chunk.primer[pos.x][pos.y][pos.z] != 0 {
                 if place {
                     offset := iPos - lastBlock
                     if math.abs(offset.x) + math.abs(offset.y) + math.abs(offset.z) != 1 {
                         if offset.x != 0 {
-                            chunk, pos, ok = getPosition({iPos.x + offset.x, iPos.y, iPos.z})
+                            chunk, pos = getPosition({iPos.x + offset.x, iPos.y, iPos.z})
                             if ok && chunk.primer[pos.x][pos.y][pos.z] != 0 {
                                 return chunk, pos, true
                             }
                         }
                         if offset.y != 0 {
-                            chunk, pos, ok = getPosition({iPos.x, iPos.y + offset.y, iPos.z})
+                            chunk, pos = getPosition({iPos.x, iPos.y + offset.y, iPos.z})
                             if ok && chunk.primer[pos.x][pos.y][pos.z] != 0 {
                                 return chunk, pos, true
                             }
                         }
                         if offset.z != 0 {
-                            chunk, pos, ok = getPosition({iPos.x, iPos.y, iPos.z + offset.z})
+                            chunk, pos = getPosition({iPos.x, iPos.y, iPos.z + offset.z})
                             if ok && chunk.primer[pos.x][pos.y][pos.z] != 0 {
                                 return chunk, pos, true
                             }
@@ -345,21 +315,7 @@ atualizeChunks :: proc(chunk: ^Chunk, pos: iVec3) -> [dynamic]^Chunk {
                     chunk.pos.y + i32(j) * offsetY,
                     chunk.pos.z + i32(k) * offsetZ
                 }
-                chunkCorner, ok, _ := util.map_force_get(&chunkMap, chunkPos)
-
-                if ok {
-                    if chunkPos.y < 1 {
-                        chunkP := Chunk{chunkPos, Primer{0..<32 = {0..<32 = {0..<32 = 1}}}}
-                        chunkCorner^ = chunkP
-                        slice := &heightSlice[{chunkPos.x, chunkPos.z}]
-                        slice[0] = int(chunkPos.y)
-                    } else {
-                        chunkP := Chunk{chunkPos, Primer{0..<32 = {0..<32 = {0..<32 = 0}}}}
-                        chunkCorner^ = chunkP
-                        slice := &heightSlice[{chunkPos.x, chunkPos.z}]
-                        slice[1] = int(chunkPos.y)
-                    }
-                }
+                _, chunkCorner := eval(chunkPos.x, chunkPos.y, chunkPos.z)
 
                 append(&chunks, chunkCorner)
             }
@@ -375,6 +331,19 @@ destroy :: proc(origin, direction: vec3) -> ([dynamic]^Chunk, iVec3, bool) {
 
     if !ok {return chunks, pos, false}
     chunk.primer[pos.x][pos.y][pos.z] = 0
+    if pos.x == 0 {
+        chunk.opened += {.West}
+    } else if pos.x == 31 {
+        chunk.opened += {.East}
+    } else if pos.y == 0 {
+        chunk.opened += {.Bottom}
+    } else if pos.y == 31 {
+        chunk.opened += {.Up}
+    } else if pos.z == 0 {
+        chunk.opened += {.South}
+    } else if pos.z == 31 {
+        chunk.opened += {.North}
+    }
 
     chunks = atualizeChunks(chunk, pos)
 
@@ -386,7 +355,7 @@ place :: proc(origin, direction: vec3) -> ([dynamic]^Chunk, iVec3, bool) {
     chunk, pos, ok := raycast(origin, direction, true)
 
     if !ok {return chunks, pos, false}
-    chunk.primer[pos.x][pos.y][pos.z] = 1
+    chunk.primer[pos.x][pos.y][pos.z] = 5
     
     chunks = atualizeChunks(chunk, pos)
 
