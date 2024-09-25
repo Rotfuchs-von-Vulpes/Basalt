@@ -321,7 +321,7 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 	gl.UseProgram(blockRender.program)
 	worldRender.drawChunks(chunks, &playerCamera, blockRender)
 	
-	gl.Viewport(0, 0, i32(playerCamera.viewPort.x / 2), i32(playerCamera.viewPort.y / 2))
+	gl.Viewport(0, 0, screenWidth, screenHeight)
 	gl.UseProgram(fboRender.program)
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 	frameBuffer.draw(fboRender)
