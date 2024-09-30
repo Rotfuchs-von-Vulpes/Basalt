@@ -17,6 +17,8 @@ import "frameBuffer"
 import "util"
 import "sky"
 
+import "tracy"
+
 @(export)
 load :: proc"c"(core: ^skeewb.core_interface) -> skeewb.module_desc {
 	context = runtime.default_context()
@@ -73,6 +75,7 @@ cameraMove :: proc() {
 
 start :: proc"c"(core: ^skeewb.core_interface) {
 	context = runtime.default_context()
+    tracy.Zone()
 
 	tracking_allocator = new(mem.Tracking_Allocator)
 	mem.tracking_allocator_init(tracking_allocator, context.allocator)
@@ -110,9 +113,8 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	gl.Enable(gl.DEPTH_TEST)
 	gl.Enable(gl.CULL_FACE)
 	gl.CullFace(gl.BACK)
-
-	// gl.Enable(gl.BLEND)
-	// gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+	gl.Enable(gl.BLEND)
+	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
 	worldRender.setupDrawing(core, &blockRender)
 
@@ -161,6 +163,7 @@ cameraSpeed: f32 = 0.0125
 
 loop :: proc"c"(core: ^skeewb.core_interface) {
 	context = runtime.default_context()
+    tracy.Zone()
 	context.allocator = mem.tracking_allocator(tracking_allocator)
 	
 	duration := time.tick_since(start_tick)
@@ -339,6 +342,8 @@ loop :: proc"c"(core: ^skeewb.core_interface) {
 
 quit :: proc"c"(core: ^skeewb.core_interface){
 	context = runtime.default_context()
+    tracy.Zone()
+	
 	prev_allocator := context.allocator
 	context.allocator = mem.tracking_allocator(tracking_allocator)
 
@@ -391,3 +396,14 @@ quit :: proc"c"(core: ^skeewb.core_interface){
 		skeewb.console_log(.INFO, fmt.tprintf("%v allocation %p was freed badly\n", bad_free.location, bad_free.memory))
 	}
 }
+
+// @(instrumentation_enter)
+// tracy_enter :: proc "contextless" (proc_address, call_site_return_address: rawptr, loc: runtime.Source_Code_Location) {
+//     context = runtime.default_context()
+// 	tracy.Zone(loc = loc)
+// }
+
+// @(instrumentation_exit)
+// tracy_exit :: proc "contextless" (proc_address, call_site_return_address: rawptr, loc: runtime.Source_Code_Location) {
+// 	//
+// }

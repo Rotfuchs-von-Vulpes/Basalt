@@ -1,2 +1,4 @@
 *.bat
 ols.json
+*.dll
+*.exe

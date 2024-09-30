@@ -104,7 +104,8 @@ isSideExposed :: proc(primers: Primers, pos: BlockPos, offset: Pos) -> bool {
 
     sidePos = BlockPos{u8(i8(sidePos.x) + x), u8(i8(sidePos.y) + y), u8(i8(sidePos.z) + z)}
     if primers[chunkXOffset + 1][chunkYOffset + 1][chunkZOffset + 1] == nil {return false}
-    return primers[chunkXOffset + 1][chunkYOffset + 1][chunkZOffset + 1].primer[sidePos.x][sidePos.y][sidePos.z] == 0;
+    id := primers[chunkXOffset + 1][chunkYOffset + 1][chunkZOffset + 1].primer[sidePos.x][sidePos.y][sidePos.z]
+    return id == 0 || id == 7;
 }
 
 hasSideExposed :: proc(primers: Primers, pos: BlockPos) -> bool {
@@ -389,7 +390,7 @@ generateMesh :: proc(chunk: world.Chunk) -> ([Direction]ivec2, [dynamic]u32, [dy
         for j: i32 = 0; j < 3; j += 1 {
             for k: i32 = 0; k < 3; k += 1 {
                 pos := [3]i32{x + i - 1, y + j - 1, z + k - 1}
-                primers[i][j][k] = &world.chunkMap[pos]
+                primers[i][j][k] = &world.allChunks[world.chunkMap[pos]]
             }
         }
     }

@@ -75,6 +75,7 @@ vec3 ACESFilm(vec3 rgb) {
 void main()
 {
     vec4 albedo = texture(textures,vec3(TexCoords, TextureID));
+    if (albedo.a < 0.5) discard;
     float occluse = 0.25 * Occlusion + 0.25;
     albedo.rgb = pow(ACESFilm(albedo.rgb), vec3(1.0 / 2.2)) * occluse;
 
@@ -84,5 +85,5 @@ void main()
     float fogFactor = 1.0 - exp(fragDist * fragDist * -0.005);
     fogFactor = clamp(fogFactor, 0.0, 1.0);
 
-    fragColor = vec4(mix(diffuse, fogColor, fogFactor), 1.0);
+    fragColor = vec4(mix(diffuse, fogColor, fogFactor), albedo.a);
 }
