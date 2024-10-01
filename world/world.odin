@@ -108,9 +108,9 @@ getNewChunk :: proc(idx: int, x, y, z: i32, heightMap: HeightMap) -> Chunk {
                 if k >= localHeight {
                     if k == 0 {
                         open += {.Bottom}
-                    } else {
+                    } else if k == 31 {
                         open += {.Up}
-                        
+                    } else {
                         if i == 0 {
                             open += {.West}
                         } else if i == 31 {
@@ -232,14 +232,26 @@ getHeightMap :: proc(x, z: i32) -> HeightMap {
 eval :: proc(x, y, z: i32) -> (Chunk, int) {
     pos := iVec3{x, y, z}
     idx, ok, _ := util.map_force_get(&chunkMap, pos)
-    chunk: Chunk
+    chunk := new(Chunk)
+    defer free(chunk)
     if ok {
         terrain := getHeightMap(x, z)
         idx^ = len(allChunks)
-        chunk = getNewChunk(idx^, x, y, z, terrain)
-        append(&allChunks, chunk)
+        chunk^ = getNewChunk(idx^, x, y, z, terrain)
+        append(&allChunks, chunk^)
     }
     return allChunks[idx^], idx^
+}
+
+add :: proc(x, y, z: i32, toAdd: bool, chunks, chunksToView: ^[dynamic]Chunk) -> ^Chunk {
+    _, idx := eval(x, y, z)
+    chunk := &allChunks[idx]
+    append(chunks, chunk^)
+    if toAdd {
+        append(chunksToView, chunk^)
+    }
+
+    return chunk
 }
 
 peak :: proc(x, y, z: i32, radius: i32) -> [dynamic]Chunk {
@@ -250,41 +262,27 @@ peak :: proc(x, y, z: i32, radius: i32) -> [dynamic]Chunk {
 
     for i := -r; i <= r; i += 1 {
         for j := -r; j <= r; j += 1 {
-            count := 1
-            run := true
-            chunk, _ := eval(x + i, 0, z + j)
-            //append(&chunks, chunk)
-            if (i != -r && i != r) && (j != -r && j != r) {
-                append(&chunksToView, chunk)
-            }
-            /*k := 1
+            toAdd := (i != -r && i != r) && (j != -r && j != r)
+            pChunk := add(x + i, 0, z + j, toAdd, &chunks, &chunksToView)
+            chunk := pChunk
+            k := 1
             for (.Up in chunk.opened) {
-                chunk, _ = eval(x + i, i32(k), z + j)
+                chunk = add(x + i, i32(k), z + j, toAdd, &chunks, &chunksToView)
                 k += 1
-                count += 1
-                append(&chunks, chunk)
-                if (i != -r && i != r) && (j != -r && j != r) {
-                    append(&chunksToView, chunk)
-                }
             }
             chunk = pChunk
             k = -1
             for (.Bottom in chunk.opened) {
-                chunk, _ = eval(x + i, i32(k), z + j)
+                chunk = add(x + i, i32(k), z + j, toAdd, &chunks, &chunksToView)
                 k -= 1
-                count += 1
-                append(&chunks, chunk)
-                if (i != -r && i != r) && (j != -r && j != r) {
-                    append(&chunksToView, chunk)
-                }
-            }*/
+            }
         }
     }
 
     for chunk in chunks {
         p := populated[chunk.pos]
         if p {continue}
-        //populate(&allChunks[chunk.id])
+        populate(&allChunks[chunk.id])
         populated[chunk.pos] = true
     }
 

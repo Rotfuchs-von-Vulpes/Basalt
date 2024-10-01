@@ -17,7 +17,7 @@ import "frameBuffer"
 import "util"
 import "sky"
 
-//import "tracy"
+import "tracy"
 
 // @(export)
 // load :: proc"c"(core: ^skeewb.core_interface) -> skeewb.module_desc {
@@ -73,11 +73,8 @@ cameraMove :: proc() {
 	playerCamera.view = math.matrix4_look_at_f32({0, 0, 0}, playerCamera.front, playerCamera.up)
 }
 
-run := true
-
 main :: proc() {
 	context = runtime.default_context()
-    //tracy.Zone()
 
 	tracking_allocator = new(mem.Tracking_Allocator)
 	mem.tracking_allocator_init(tracking_allocator, context.allocator)
@@ -106,7 +103,7 @@ main :: proc() {
 	}
 	skeewb.console_log(.INFO, "successfully created an OpenGL context")
 
-	sdl2.GL_SetSwapInterval(0)
+	sdl2.GL_SetSwapInterval(1)
 
 	gl.load_up_to(3, 3, sdl2.gl_set_proc_address)
 	
@@ -136,6 +133,7 @@ main :: proc() {
 	chunks = worldRender.frustumCulling(allChunks, &playerCamera)
 
 	loop: for {
+		tracy.FrameMark()
 		duration := time.tick_since(start_tick)
 		deltaTime := f32(time.duration_milliseconds(duration))
 
