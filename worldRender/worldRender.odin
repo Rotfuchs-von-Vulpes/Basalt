@@ -87,12 +87,23 @@ Render :: struct{
 	texture: u32,
 }
 
-setupDrawing :: proc(core: ^skeewb.core_interface, render: ^Render) {
-	vertShader := core.resource_load("block_vert", "basalt/assets/shaders/blocks_vert.glsl")
-	fragShader := core.resource_load("block_frag", "basalt/assets/shaders/blocks_frag.glsl")
+vertShader :: #load("../assets/shaders/blocks_vert.glsl", string)
+fragShader :: #load("../assets/shaders/blocks_frag.glsl", string)
 
+madera :: #load("../assets/textures/box.png", string)
+preda :: #load("../assets/textures/stone.png", string)
+terra :: #load("../assets/textures/dirt.png", string)
+teratu :: #load("../assets/textures/dirt_with_grass.png", string)
+matu :: #load("../assets/textures/grass.png", string)
+area :: #load("../assets/textures/sand.png", string)
+foia :: #load("../assets/textures/leaves.png", string)
+arvre :: #load("../assets/textures/tree.png", string)
+arvre2 :: #load("../assets/textures/tree_top.png", string)
+pread :: #load("../assets/textures/cobble.png", string)
+
+setupDrawing :: proc(render: ^Render) {
 	shaderSuccess: bool
-	render.program, shaderSuccess = gl.load_shaders_source(core.resource_string(vertShader), core.resource_string(fragShader))
+	render.program, shaderSuccess = gl.load_shaders_source(vertShader, fragShader)
 
     if !shaderSuccess {
         info: [^]u8
@@ -110,16 +121,16 @@ setupDrawing :: proc(core: ^skeewb.core_interface, render: ^Render) {
 
 	width, height, channels: i32
 	datas := []string{
-		core.resource_string(core.resource_load("madera", "basalt/assets/textures/box.png")),
-		core.resource_string(core.resource_load("preda", "basalt/assets/textures/stone.png")),
-		core.resource_string(core.resource_load("terra", "basalt/assets/textures/dirt.png")),
-		core.resource_string(core.resource_load("teratu", "basalt/assets/textures/dirt_with_grass.png")),
-		core.resource_string(core.resource_load("matu", "basalt/assets/textures/grass.png")),
-		core.resource_string(core.resource_load("area", "basalt/assets/textures/sand.png")),
-		core.resource_string(core.resource_load("foia", "basalt/assets/textures/leaves.png")),
-		core.resource_string(core.resource_load("arvre", "basalt/assets/textures/tree.png")),
-		core.resource_string(core.resource_load("arvre2", "basalt/assets/textures/tree_top.png")),
-		core.resource_string(core.resource_load("pread", "basalt/assets/textures/cobble.png")),
+		madera,
+		preda,
+		terra,
+		teratu,
+		matu,
+		area,
+		foia,
+		arvre,
+		arvre2,
+		pread,
 	}
 	gl.TexImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.SRGB8_ALPHA8, 16, 16, i32(len(datas)), 0, gl.RGBA, gl.UNSIGNED_BYTE, nil)
 	for tex, idx in datas {

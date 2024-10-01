@@ -2,3 +2,5 @@
 ols.json
 *.dll
 *.exe
+*.pdb
+.vscode

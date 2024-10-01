@@ -37,7 +37,10 @@ model: mat4
 
 sunDirection := vec3{0, 1, 0}
 
-setup :: proc(core: ^skeewb.core_interface, camera: ^util.Camera, render: ^Render) {
+vertShader :: #load("../assets/shaders/sky_vert.glsl", string)
+fragShader :: #load("../assets/shaders/sky_frag.glsl", string)
+
+setup :: proc(camera: ^util.Camera, render: ^Render) {
 	gl.GenVertexArrays(1, &render.vao)
 	gl.BindVertexArray(render.vao)
 
@@ -48,11 +51,8 @@ setup :: proc(core: ^skeewb.core_interface, camera: ^util.Camera, render: ^Rende
 	gl.EnableVertexAttribArray(0)
 	gl.VertexAttribPointer(0, 2, gl.FLOAT, false, 2 * size_of(f32), 0)
 
-	vertShader := core.resource_load("sky_vert", "basalt/assets/shaders/sky_vert.glsl")
-	fragShader := core.resource_load("sky_frag", "basalt/assets/shaders/sky_frag.glsl")
-
 	shaderSuccess: bool
-	render.program, shaderSuccess = gl.load_shaders_source(core.resource_string(vertShader), core.resource_string(fragShader))
+	render.program, shaderSuccess = gl.load_shaders_source(vertShader, fragShader)
 
     if !shaderSuccess {
         info: [^]u8
@@ -95,7 +95,10 @@ draw :: proc(camera: ^util.Camera, render: Render, time: f32) {
     gl.DrawArrays(gl.TRIANGLES, 0, 6)
 }
 
-setupSun :: proc(core: ^skeewb.core_interface, camera: ^util.Camera, render: ^Render) {
+vertShader2 :: #load("../assets/shaders/sun_vert.glsl", string)
+fragShader2 :: #load("../assets/shaders/sun_frag.glsl", string)
+
+setupSun :: proc(camera: ^util.Camera, render: ^Render) {
 	// gl.GenTextures(1, &render.texture)
 	// gl.BindTexture(gl.TEXTURE_2D_ARRAY, render.texture)
 	// gl.TexParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT)
@@ -134,11 +137,8 @@ setupSun :: proc(core: ^skeewb.core_interface, camera: ^util.Camera, render: ^Re
 	gl.EnableVertexAttribArray(0)
 	gl.VertexAttribPointer(0, 2, gl.FLOAT, false, 2 * size_of(f32), 0)
 
-	vertShader := core.resource_load("sun_vert", "basalt/assets/shaders/sun_vert.glsl")
-	fragShader := core.resource_load("sun_frag", "basalt/assets/shaders/sun_frag.glsl")
-
 	shaderSuccess: bool
-	render.program, shaderSuccess = gl.load_shaders_source(core.resource_string(vertShader), core.resource_string(fragShader))
+	render.program, shaderSuccess = gl.load_shaders_source(vertShader2, fragShader2)
 
     if !shaderSuccess {
         info: [^]u8

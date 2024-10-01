@@ -95,7 +95,8 @@ getTerrain :: proc(x, z: i32, i, j: int) -> i32 {
 }
 
 getNewChunk :: proc(idx: int, x, y, z: i32, heightMap: HeightMap) -> Chunk {
-    primer := Primer{0..<32 = {0..<32 = {0..<32 = 0}}}
+    primer := new(Primer)
+    defer free(primer)
 
     open: FaceSet = {}
     
@@ -141,7 +142,7 @@ getNewChunk :: proc(idx: int, x, y, z: i32, heightMap: HeightMap) -> Chunk {
         }
     }
 
-    return Chunk{idx, {x, y, z}, primer, open}
+    return Chunk{idx, {x, y, z}, primer^, open}
 }
 
 setBlock :: proc(x, y, z: i32, id: u32, c: ^Chunk) {
@@ -251,13 +252,12 @@ peak :: proc(x, y, z: i32, radius: i32) -> [dynamic]Chunk {
         for j := -r; j <= r; j += 1 {
             count := 1
             run := true
-            pChunk, _ := eval(x + i, 0, z + j)
-            chunk := pChunk
-            append(&chunks, chunk)
+            chunk, _ := eval(x + i, 0, z + j)
+            //append(&chunks, chunk)
             if (i != -r && i != r) && (j != -r && j != r) {
                 append(&chunksToView, chunk)
             }
-            k := 1
+            /*k := 1
             for (.Up in chunk.opened) {
                 chunk, _ = eval(x + i, i32(k), z + j)
                 k += 1
@@ -277,14 +277,14 @@ peak :: proc(x, y, z: i32, radius: i32) -> [dynamic]Chunk {
                 if (i != -r && i != r) && (j != -r && j != r) {
                     append(&chunksToView, chunk)
                 }
-            }
+            }*/
         }
     }
 
     for chunk in chunks {
         p := populated[chunk.pos]
         if p {continue}
-        populate(&allChunks[chunk.id])
+        //populate(&allChunks[chunk.id])
         populated[chunk.pos] = true
     }
 

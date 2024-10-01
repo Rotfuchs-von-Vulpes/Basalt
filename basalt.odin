@@ -17,22 +17,22 @@ import "frameBuffer"
 import "util"
 import "sky"
 
-import "tracy"
+//import "tracy"
 
-@(export)
-load :: proc"c"(core: ^skeewb.core_interface) -> skeewb.module_desc {
-	context = runtime.default_context()
+// @(export)
+// load :: proc"c"(core: ^skeewb.core_interface) -> skeewb.module_desc {
+// 	context = runtime.default_context()
 
-	core.event_listen("start", skeewb.event_callback(start));
-	core.event_listen("loop", skeewb.event_callback(loop));
-	core.event_listen("quit", skeewb.event_callback(quit));
+// 	core.event_listen("start", skeewb.event_callback(start));
+// 	core.event_listen("loop", skeewb.event_callback(loop));
+// 	core.event_listen("quit", skeewb.event_callback(quit));
 
-	return (skeewb.module_desc) {
-		modid = "basalt",
-		version = {0, 0, 1},
-		interface = nil,
-	}
-}
+// 	return (skeewb.module_desc) {
+// 		modid = "basalt",
+// 		version = {0, 0, 1},
+// 		interface = nil,
+// 	}
+// }
 
 lastTimeTicks := time.tick_now()
 nbFrames := 0
@@ -73,9 +73,11 @@ cameraMove :: proc() {
 	playerCamera.view = math.matrix4_look_at_f32({0, 0, 0}, playerCamera.front, playerCamera.up)
 }
 
-start :: proc"c"(core: ^skeewb.core_interface) {
+run := true
+
+main :: proc() {
 	context = runtime.default_context()
-    tracy.Zone()
+    //tracy.Zone()
 
 	tracking_allocator = new(mem.Tracking_Allocator)
 	mem.tracking_allocator_init(tracking_allocator, context.allocator)
@@ -93,7 +95,6 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	window = sdl2.CreateWindow("testando se muda alguma coisa", sdl2.WINDOWPOS_CENTERED, sdl2.WINDOWPOS_CENTERED, screenWidth, screenHeight, sdl2.WINDOW_RESIZABLE | sdl2.WINDOW_OPENGL)
 	if (window == nil) {
 		skeewb.console_log(.ERROR, "could not create a window sdl error: %s", sdl2.GetError())
-		core.quit(-1)
 	}
 	skeewb.console_log(.INFO, "successfully created a window")
 
@@ -102,7 +103,6 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	gl_context = sdl2.GL_CreateContext(window);
 	if (gl_context == nil) {
 		skeewb.console_log(.ERROR, "could not create an OpenGL context sdl error: %s", sdl2.GetError())
-		core.quit(-1)
 	}
 	skeewb.console_log(.INFO, "successfully created an OpenGL context")
 
@@ -116,7 +116,7 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	gl.Enable(gl.BLEND)
 	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
-	worldRender.setupDrawing(core, &blockRender)
+	worldRender.setupDrawing(&blockRender)
 
 	// tmp := world.peak(playerCamera.chunk.x, playerCamera.chunk.y, playerCamera.chunk.z, playerCamera.viewDistance)
 	// defer delete(tmp)
@@ -127,13 +127,188 @@ start :: proc"c"(core: ^skeewb.core_interface) {
 	playerCamera.proj = math.matrix4_infinite_perspective_f32(45, playerCamera.viewPort.x / playerCamera.viewPort.y, 0.1)
 	playerCamera.view = math.matrix4_look_at_f32({0, 0, 0}, playerCamera.front, playerCamera.up)
 
-	frameBuffer.setup(core, &playerCamera, &fboRender)
+	frameBuffer.setup(&playerCamera, &fboRender)
 
-	sky.setup(core, &playerCamera, &skyRender)
-	sky.setupSun(core, &playerCamera, &sunRender)
+	sky.setup(&playerCamera, &skyRender)
+	sky.setupSun(&playerCamera, &sunRender)
 
 	worldRender.frustumMove(&allChunks, &playerCamera)
 	chunks = worldRender.frustumCulling(allChunks, &playerCamera)
+
+	loop: for {
+		duration := time.tick_since(start_tick)
+		deltaTime := f32(time.duration_milliseconds(duration))
+
+		event: sdl2.Event
+			
+		for sdl2.PollEvent(&event) {
+			if event.type == .QUIT || event.type == .WINDOWEVENT && event.window.event == .CLOSE {
+				quit()
+				break loop
+			} else if event.type == .KEYUP {
+				#partial switch (event.key.keysym.sym) {
+					case .ESCAPE:
+						quit()
+						break loop
+					case .W:
+						toFront = false
+					case .S:
+						toBehind = false
+					case .A:
+						toLeft = false
+					case .D:
+						toRight = false
+				}
+			} else if event.type == .KEYDOWN {
+				#partial switch (event.key.keysym.sym) {
+					case .ESCAPE:
+						quit()
+						break loop
+					case .W:
+						toFront = true
+					case .S:
+						toBehind = true
+					case .A:
+						toLeft = true
+					case .D:
+						toRight = true
+				}
+			} else if event.type == .MOUSEMOTION {
+				xpos :=  f32(event.motion.xrel)
+				ypos := -f32(event.motion.yrel)
+			
+				sensitivity: f32 = 0.25
+				xoffset := xpos * sensitivity
+				yoffset := ypos * sensitivity
+			
+				yaw += xoffset
+				pitch += yoffset
+
+				if pitch >= 89 {
+					pitch = 89
+				}
+				if pitch <= -89 {
+					pitch = -89
+				}
+
+				yawRadians := yaw * math.RAD_PER_DEG
+				pitchRadians := pitch * math.RAD_PER_DEG
+			
+				playerCamera.front = {
+					math.cos(yawRadians) * math.cos(pitchRadians),
+					math.sin(pitchRadians),
+					math.sin(yawRadians) * math.cos(pitchRadians)
+				}
+				playerCamera.front = math.vector_normalize(playerCamera.front)
+				
+				playerCamera.up = {
+					-math.sin(pitchRadians) * math.cos(yawRadians),
+					math.cos(pitchRadians),
+					-math.sin(pitchRadians) * math.sin(yawRadians)
+				}
+				playerCamera.up = math.vector_normalize(playerCamera.up)
+
+				playerCamera.right = math.cross(playerCamera.front, playerCamera.up)
+				
+				playerCamera.view = math.matrix4_look_at_f32({0, 0, 0}, playerCamera.front, playerCamera.up)
+				if chunks != nil {delete(chunks)}
+				chunks = worldRender.frustumCulling(allChunks, &playerCamera)
+			} else if event.type == .MOUSEBUTTONDOWN {
+				if event.button.button == 1 {
+					chunksToDelete, pos, ok := world.destroy(playerCamera.pos, playerCamera.front)
+					defer delete(chunksToDelete)
+					if ok {
+						worldRender.destroy(chunksToDelete)
+						reloadChunks()
+					}
+				} else if event.button.button == 3 {
+					chunksToDelete, pos, ok := world.place(playerCamera.pos, playerCamera.front)
+					defer delete(chunksToDelete)
+					if ok {
+						worldRender.destroy(chunksToDelete)
+						reloadChunks()
+					}
+				}
+			}
+		}
+
+		scale: [3]f32 = {0, 0, 0}
+
+		if toFront != toBehind {
+			if toFront {
+				scale += playerCamera.front
+			} else {
+				scale -= playerCamera.front
+			}
+		}
+
+		if toLeft != toRight {
+			if toLeft {
+				scale -= playerCamera.right
+			} else {
+				scale += playerCamera.right
+			}
+		}
+
+		if scale.x != 0 || scale.y != 0 || scale.z != 0 {
+			scale = math.vector_normalize(scale) * cameraSpeed * f32(time.duration_milliseconds(time.tick_since(last)))
+			playerCamera.pos += scale;
+			if chunks != nil {delete(chunks)}
+			chunks = worldRender.frustumCulling(allChunks, &playerCamera)
+		}
+		last = time.tick_now()
+		
+		chunkX := i32(math.floor(playerCamera.pos.x / 32))
+		chunkY := i32(math.floor(playerCamera.pos.y / 32))
+		chunkZ := i32(math.floor(playerCamera.pos.z / 32))
+		moved := false
+
+		if chunkX != lastChunkX {
+			playerCamera.chunk.x = chunkX
+			lastChunkX = chunkX
+			moved = true
+		}
+		if chunkY != lastChunkY {
+			playerCamera.chunk.y = chunkY
+			lastChunkY = chunkY
+			moved = true
+		}
+		if chunkZ != lastChunkZ {
+			playerCamera.chunk.z = chunkZ
+			lastChunkZ = chunkZ
+			moved = true
+		}
+
+		if moved {reloadChunks()}
+
+		gl.UseProgram(fboRender.program)
+		gl.BindFramebuffer(gl.FRAMEBUFFER, fboRender.id)
+		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+
+		gl.Viewport(0, 0, i32(playerCamera.viewPort.x), i32(playerCamera.viewPort.y))
+		gl.UseProgram(skyRender.program)
+		sky.draw(&playerCamera, skyRender, deltaTime)
+		gl.UseProgram(sunRender.program)
+		sky.drawSun(&playerCamera, sunRender, deltaTime)
+		gl.Enable(gl.DEPTH_TEST)
+		gl.UseProgram(blockRender.program)
+		worldRender.drawChunks(chunks, &playerCamera, blockRender)
+		
+		gl.Viewport(0, 0, screenWidth, screenHeight)
+		gl.UseProgram(fboRender.program)
+		gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
+		frameBuffer.draw(fboRender)
+
+		sdl2.GL_SwapWindow(window)
+		
+		nbFrames += 1
+		if time.duration_seconds(time.tick_since(lastTimeTicks)) >= 1.0 {
+			fps = nbFrames
+			nbFrames = 0
+			lastTimeTicks = time.tick_now()
+		}
+		sdl2.SetWindowTitle(window, strings.unsafe_string_to_cstring(fmt.tprintfln("FPS: %d", fps)))
+	}
 }
 
 toFront := false
@@ -161,188 +336,9 @@ reloadChunks :: proc() {
 last: time.Tick
 cameraSpeed: f32 = 0.0125
 
-loop :: proc"c"(core: ^skeewb.core_interface) {
+quit :: proc(){
 	context = runtime.default_context()
-    tracy.Zone()
-	context.allocator = mem.tracking_allocator(tracking_allocator)
-	
-	duration := time.tick_since(start_tick)
-	deltaTime := f32(time.duration_milliseconds(duration))
-
-	event: sdl2.Event
-		
-	for sdl2.PollEvent(&event) {
-		if event.type == .QUIT || event.type == .WINDOWEVENT && event.window.event == .CLOSE {
-			quit(core)
-			core.quit(0)
-		} else if event.type == .KEYUP {
-			#partial switch (event.key.keysym.sym) {
-				case .ESCAPE:
-					quit(core)
-					core.quit(0)
-				case .W:
-					toFront = false
-				case .S:
-					toBehind = false
-				case .A:
-					toLeft = false
-				case .D:
-					toRight = false
-			}
-		} else if event.type == .KEYDOWN {
-			#partial switch (event.key.keysym.sym) {
-				case .ESCAPE:
-					quit(core)
-					core.quit(0)
-				case .W:
-					toFront = true
-				case .S:
-					toBehind = true
-				case .A:
-					toLeft = true
-				case .D:
-					toRight = true
-			}
-		} else if event.type == .MOUSEMOTION {
-			xpos :=  f32(event.motion.xrel)
-			ypos := -f32(event.motion.yrel)
-		
-			sensitivity: f32 = 0.25
-			xoffset := xpos * sensitivity
-			yoffset := ypos * sensitivity
-		
-			yaw += xoffset
-			pitch += yoffset
-
-			if pitch >= 89 {
-				pitch = 89
-			}
-			if pitch <= -89 {
-				pitch = -89
-			}
-
-			yawRadians := yaw * math.RAD_PER_DEG
-			pitchRadians := pitch * math.RAD_PER_DEG
-		
-			playerCamera.front = {
-				math.cos(yawRadians) * math.cos(pitchRadians),
-				math.sin(pitchRadians),
-				math.sin(yawRadians) * math.cos(pitchRadians)
-			}
-			playerCamera.front = math.vector_normalize(playerCamera.front)
-			
-			playerCamera.up = {
-				-math.sin(pitchRadians) * math.cos(yawRadians),
-				 math.cos(pitchRadians),
-				-math.sin(pitchRadians) * math.sin(yawRadians)
-			}
-			playerCamera.up = math.vector_normalize(playerCamera.up)
-
-			playerCamera.right = math.cross(playerCamera.front, playerCamera.up)
-			
-			playerCamera.view = math.matrix4_look_at_f32({0, 0, 0}, playerCamera.front, playerCamera.up)
-			if chunks != nil {delete(chunks)}
-			chunks = worldRender.frustumCulling(allChunks, &playerCamera)
-		} else if event.type == .MOUSEBUTTONDOWN {
-			if event.button.button == 1 {
-				chunksToDelete, pos, ok := world.destroy(playerCamera.pos, playerCamera.front)
-				defer delete(chunksToDelete)
-				if ok {
-					worldRender.destroy(chunksToDelete)
-					reloadChunks()
-				}
-			} else if event.button.button == 3 {
-				chunksToDelete, pos, ok := world.place(playerCamera.pos, playerCamera.front)
-				defer delete(chunksToDelete)
-				if ok {
-					worldRender.destroy(chunksToDelete)
-					reloadChunks()
-				}
-			}
-		}
-	}
-
-	scale: [3]f32 = {0, 0, 0}
-
-	if toFront != toBehind {
-		if toFront {
-			scale += playerCamera.front
-		} else {
-			scale -= playerCamera.front
-		}
-	}
-
-	if toLeft != toRight {
-		if toLeft {
-			scale -= playerCamera.right
-		} else {
-			scale += playerCamera.right
-		}
-	}
-
-	if scale.x != 0 || scale.y != 0 || scale.z != 0 {
-		scale = math.vector_normalize(scale) * cameraSpeed * f32(time.duration_milliseconds(time.tick_since(last)))
-		playerCamera.pos += scale;
-		if chunks != nil {delete(chunks)}
-		chunks = worldRender.frustumCulling(allChunks, &playerCamera)
-	}
-	last = time.tick_now()
-	
-	chunkX := i32(math.floor(playerCamera.pos.x / 32))
-	chunkY := i32(math.floor(playerCamera.pos.y / 32))
-	chunkZ := i32(math.floor(playerCamera.pos.z / 32))
-	moved := false
-
-	if chunkX != lastChunkX {
-		playerCamera.chunk.x = chunkX
-		lastChunkX = chunkX
-		moved = true
-	}
-	if chunkY != lastChunkY {
-		playerCamera.chunk.y = chunkY
-		lastChunkY = chunkY
-		moved = true
-	}
-	if chunkZ != lastChunkZ {
-		playerCamera.chunk.z = chunkZ
-		lastChunkZ = chunkZ
-		moved = true
-	}
-
-	if moved {reloadChunks()}
-
-	gl.UseProgram(fboRender.program)
-	gl.BindFramebuffer(gl.FRAMEBUFFER, fboRender.id)
-	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-
-	gl.Viewport(0, 0, i32(playerCamera.viewPort.x), i32(playerCamera.viewPort.y))
-	gl.UseProgram(skyRender.program)
-	sky.draw(&playerCamera, skyRender, deltaTime)
-	gl.UseProgram(sunRender.program)
-	sky.drawSun(&playerCamera, sunRender, deltaTime)
-	gl.Enable(gl.DEPTH_TEST)
-	gl.UseProgram(blockRender.program)
-	worldRender.drawChunks(chunks, &playerCamera, blockRender)
-	
-	gl.Viewport(0, 0, screenWidth, screenHeight)
-	gl.UseProgram(fboRender.program)
-	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-	frameBuffer.draw(fboRender)
-
-	sdl2.GL_SwapWindow(window)
-	
-	nbFrames += 1
-	if time.duration_seconds(time.tick_since(lastTimeTicks)) >= 1.0 {
-		fps = nbFrames
-		nbFrames = 0
-		lastTimeTicks = time.tick_now()
-	}
-	sdl2.SetWindowTitle(window, strings.unsafe_string_to_cstring(fmt.tprintfln("FPS: %d", fps)))
-}
-
-quit :: proc"c"(core: ^skeewb.core_interface){
-	context = runtime.default_context()
-    tracy.Zone()
+    //tracy.Zone()
 	
 	prev_allocator := context.allocator
 	context.allocator = mem.tracking_allocator(tracking_allocator)

@@ -34,7 +34,10 @@ quadVertices := [?]f32{
 	 1.0,  1.0,  1.0, 1.0
 }
 
-setup :: proc(core: ^skeewb.core_interface, camera: ^util.Camera, render: ^Render) {
+vertShader :: #load("../assets/shaders/quad_vert.glsl", string)
+fragShader :: #load("../assets/shaders/quad_frag.glsl", string)
+
+setup :: proc(camera: ^util.Camera, render: ^Render) {
     gl.GenFramebuffers(1, &render.id)
 	gl.BindFramebuffer(gl.FRAMEBUFFER, render.id)
 
@@ -62,7 +65,7 @@ setup :: proc(core: ^skeewb.core_interface, camera: ^util.Camera, render: ^Rende
 
 	if gl.CheckFramebufferStatus(gl.FRAMEBUFFER) != u32(gl.FRAMEBUFFER_COMPLETE) {
 		skeewb.console_log(.ERROR, "Framebuffer is not complete!")
-		core.quit(-1)
+		//core.quit(-1)
 	}
 
 	gl.GenVertexArrays(1, &render.vao)
@@ -75,11 +78,8 @@ setup :: proc(core: ^skeewb.core_interface, camera: ^util.Camera, render: ^Rende
 	gl.EnableVertexAttribArray(1)
 	gl.VertexAttribPointer(1, 2, gl.FLOAT, false, 4 * size_of(quadVertices[0]), 2 * size_of(quadVertices[0]))
 
-	vertShader := core.resource_load("quad_vert", "basalt/assets/shaders/quad_vert.glsl")
-	fragShader := core.resource_load("quad_frag", "basalt/assets/shaders/quad_frag.glsl")
-
 	shaderSuccess: bool
-	render.program, shaderSuccess = gl.load_shaders_source(core.resource_string(vertShader), core.resource_string(fragShader))
+	render.program, shaderSuccess = gl.load_shaders_source(vertShader, fragShader)
 
     if !shaderSuccess {
         info: [^]u8
@@ -89,7 +89,7 @@ setup :: proc(core: ^skeewb.core_interface, camera: ^util.Camera, render: ^Rende
     }
 	
 	render.uniforms = gl.get_uniforms_from_program(render.program)
-	gl.Uniform1i(render.uniforms["screenTexture"].location, 0)
+	//gl.Uniform1i(render.uniforms["screenTexture"].location, 0)
 }
 
 draw :: proc(render: Render) {
