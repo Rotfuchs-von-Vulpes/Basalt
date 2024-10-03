@@ -243,7 +243,7 @@ eval :: proc(x, y, z: i32) -> (Chunk, int) {
     return allChunks[idx^], idx^
 }
 
-add :: proc(x, y, z: i32, toAdd: bool, chunks, chunksToView: ^[dynamic]Chunk) -> ^Chunk {
+addChunk :: proc(x, y, z: i32, toAdd: bool, chunks, chunksToView: ^[dynamic]Chunk) -> bool {
     _, idx := eval(x, y, z)
     chunk := &allChunks[idx]
     append(chunks, chunk^)
@@ -251,7 +251,11 @@ add :: proc(x, y, z: i32, toAdd: bool, chunks, chunksToView: ^[dynamic]Chunk) ->
         append(chunksToView, chunk^)
     }
 
-    return chunk
+    return .Up in chunk.opened
+}
+
+firstpass :: proc(x, y, z, radius) -> [dynamic]Node {
+    
 }
 
 peak :: proc(x, y, z: i32, radius: i32) -> [dynamic]Chunk {
@@ -263,17 +267,17 @@ peak :: proc(x, y, z: i32, radius: i32) -> [dynamic]Chunk {
     for i := -r; i <= r; i += 1 {
         for j := -r; j <= r; j += 1 {
             toAdd := (i != -r && i != r) && (j != -r && j != r)
-            pChunk := add(x + i, 0, z + j, toAdd, &chunks, &chunksToView)
-            chunk := pChunk
+            open := addChunk(x + i, 0, z + j, toAdd, &chunks, &chunksToView)
+            opened := open
             k := 1
-            for (.Up in chunk.opened) {
-                chunk = add(x + i, i32(k), z + j, toAdd, &chunks, &chunksToView)
+            for opened {
+                opened = addChunk(x + i, i32(k), z + j, toAdd, &chunks, &chunksToView)
                 k += 1
             }
-            chunk = pChunk
+            opened = open
             k = -1
-            for (.Bottom in chunk.opened) {
-                chunk = add(x + i, i32(k), z + j, toAdd, &chunks, &chunksToView)
+            for opened {
+                opened = addChunk(x + i, i32(k), z + j, toAdd, &chunks, &chunksToView)
                 k -= 1
             }
         }
