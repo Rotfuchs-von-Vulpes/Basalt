@@ -254,9 +254,9 @@ addChunk :: proc(x, y, z: i32, toAdd: bool, chunks, chunksToView: ^[dynamic]Chun
     return .Up in chunk.opened
 }
 
-firstpass :: proc(x, y, z, radius) -> [dynamic]Node {
-    
-}
+// firstpass :: proc(x, y, z, radius) -> [dynamic]Node {
+
+// }
 
 peak :: proc(x, y, z: i32, radius: i32) -> [dynamic]Chunk {
     chunksToView := [dynamic]Chunk{}
