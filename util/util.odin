@@ -14,7 +14,6 @@ Camera :: struct{
 	up: vec3,
 	right: vec3,
 	chunk: [3]i32,
-	viewDistance: i32,
     viewPort: vec2,
 	proj, view: mat4
 }

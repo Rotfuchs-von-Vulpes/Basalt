@@ -50,7 +50,7 @@ playerCamera := util.Camera{
 	{0, 0, -1}, 
 	{0, 1, 0}, 
 	{1, 0, 0}, 
-	{0, 0, 0}, 6, 
+	{0, 0, 0}, 
 	{2 * f32(screenWidth), 2 * f32(screenHeight)}, 
 	math.MATRIX4F32_IDENTITY, math.MATRIX4F32_IDENTITY
 }
@@ -324,7 +324,7 @@ lastChunkZ := playerCamera.chunk.z
 reloadChunks :: proc() {
 	if allChunks != nil {delete(allChunks)}
 	if chunks != nil {delete(chunks)}
-	tmp := world.peak(playerCamera.chunk.x, playerCamera.chunk.y, playerCamera.chunk.z, playerCamera.viewDistance)
+	tmp := world.peak(playerCamera.chunk.x, playerCamera.chunk.y, playerCamera.chunk.z)
 	defer delete(tmp)
 	allChunks = worldRender.setupManyChunks(tmp)
 	worldRender.frustumMove(&allChunks, &playerCamera)

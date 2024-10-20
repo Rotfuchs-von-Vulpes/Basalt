@@ -1,14 +1,13 @@
 package world
 
 import "../skeewb"
-import "core:math/noise"
-import "core:math/rand"
 import "core:math"
+import "core:math/rand"
 import "core:fmt"
 import "../util"
+import "terrain"
 
 Primer :: [32][32][32]u32
-HeightMap :: [32][32]i32
 
 iVec2 :: [2]i32
 iVec3 :: [3]i32
@@ -20,144 +19,174 @@ FaceSet :: bit_set[Direction]
 Chunk :: struct {
     id: int,
     pos: iVec3,
+    sides: [Direction]int,
     primer: Primer,
     opened: FaceSet,
+    level: int
 }
 
 allOpened: FaceSet = {.Bottom, .East, .North, .South, .Up, .West}
 
 allChunks := [dynamic]Chunk{}
 chunkMap := make(map[iVec3]int)
+nodeMap := make(map[iVec3]int)
+blocked := make(map[iVec3]bool)
 populated := make(map[iVec3]bool)
 
-// getNoised :: proc(a, b: i32, c, d: int) -> int {
-//     posX := f64(a)
-//     posZ := f64(b)
-//     x := f64(c)
-//     z := f64(d)
-//     return int(math.floor(32 * (0.5 * noise.noise_2d(0, {posX + x / 32, posZ + z / 32}) + 0.5)))
-// }
-
-Noise :: struct {
-    seed: i64,
-    octaves: int,
-    lacunarity: f64,
-    persistence: f32,
-    scale: f64,
-}
-
-pow :: proc(n: f32, exp: int) -> f32 {
-    tmp := n
-    for i in 1..<exp {tmp *= n}
-    return tmp
-}
-
-seed: i64 = 1;
-continentalness := Noise{seed, 8, 2.25, 0.5, 0.01}
-erosion := Noise{seed + 1, 4, 2, 0.375, 0.25}
-peaksAndValleys := Noise{seed + 2, 12, 2, 0.75, 0.375}
-
-peake :: proc(n: f32) -> f32 {
-    return n * n * 0.25
-}
-
-erode :: proc(n: f32) -> f32 {
-    return math.clamp(n, 0, 1)
-}
-
-flooding :: proc(n: f32) -> f32 {
-    return n > 0.5 ? n : math.clamp(pow(2 * n, 9), 0.1, 0.5)
-}
-
-mix :: proc(continent, eroding, peaking: f32) -> f32 {
-    return continent < 0.5 ? flooding(continent) : continent + erode(eroding) * peake(peaking);
-}
-
-getNoised :: proc(n: Noise, x, z: f64) -> f32 {
-    noised: f32 = 0
-
-    for i in 0..<n.octaves {
-        noised += pow(n.persistence, i) * noise.noise_2d(n.seed + i64(i), {n.lacunarity * n.scale * x, n.lacunarity * n.scale * z})
-    }
-
-    return 0.5 * noised + 0.5
-}
-
-getTerrain :: proc(x, z: i32, i, j: int) -> i32 {
-    posX := f64(x) + f64(i) / 32
-    posZ := f64(z) + f64(j) / 32
-    continent := getNoised(continentalness, posX, posZ)
-    eroding := getNoised(erosion, posX, posZ)
-    peaking := getNoised(peaksAndValleys, posX, posZ)
-    earlyTerrain := mix(continent, eroding, peaking)
-
-    return i32(31 * earlyTerrain)
-}
-
-getNewChunk :: proc(idx: int, x, y, z: i32, heightMap: HeightMap) -> Chunk {
+getNewChunk :: proc(id: int, x, y, z: i32) -> Chunk {
     primer := new(Primer)
     defer free(primer)
 
     open: FaceSet = {}
-    
+
+    sides: [Direction]int = {
+        .Up = -1,
+        .Bottom = -1,
+        .North = -1,
+        .South = -1,
+        .East = -1,
+        .West = -1
+    }
+
+    return Chunk{id, {x, y, z}, sides, primer^, open, 0}
+}
+
+setBlocksChunk :: proc(chunk: ^Chunk, heightMap: terrain.HeightMap) {
     for i in 0..<32 {
         for j in 0..<32 {
             height := int(heightMap[i][j])
-            localHeight := height - int(y) * 32
+            localHeight := height - int(chunk.pos.y) * 32
             for k in 0..<32 {
                 if k >= localHeight {
                     if k == 0 {
-                        open += {.Bottom}
+                        chunk.opened += {.Bottom}
                     } else if k == 31 {
-                        open += {.Up}
-                    } else {
-                        if i == 0 {
-                            open += {.West}
-                        } else if i == 31 {
-                            open += {.East}
-                        } else if j == 0 {
-                            open += {.South}
-                        } else if j == 31 {
-                            open += {.North}
-                        }
+                        chunk.opened += {.Up}
+                    }
+                    if i == 0 {
+                        chunk.opened += {.West}
+                    } else if i == 31 {
+                        chunk.opened += {.East}
+                    } else if j == 0 {
+                        chunk.opened += {.South}
+                    } else if j == 31 {
+                        chunk.opened += {.North}
                     }
                     break
                 }
                 if height > 15 {
                     if localHeight - k == 1 {
-                        primer[i][k][j] = 3
+                        chunk.primer[i][k][j] = 3
                     } else if localHeight - k < 4 {
-                        primer[i][k][j] = 2
+                        chunk.primer[i][k][j] = 2
                     } else {
-                        primer[i][k][j] = 1
+                        chunk.primer[i][k][j] = 1
                     }
                 } else {
                     if localHeight - k == 1 {
-                        primer[i][k][j] = 4
+                        chunk.primer[i][k][j] = 4
                     } else {
-                        primer[i][k][j] = 1
+                        chunk.primer[i][k][j] = 1
                     }
                 }
             }
         }
     }
 
-    return Chunk{idx, {x, y, z}, primer^, open}
+    chunk.level = 1
 }
 
-setBlock :: proc(x, y, z: i32, id: u32, c: ^Chunk) {
-    if x >= 32 || x < 0 || y >= 32 || y < 0 || z >= 32 || z < 0 {
-        return
-    } else {
-        c.primer[x][y][z] = id
+setBlock :: proc(x, y, z: i32, id: u32, c: ^Chunk, chunks: ^[dynamic]int) {
+    x := x; y := y; z := z; c := c
+
+    for x >= 32 {
+        x -= 32
+        side := c.sides[.East]
+        if side == -1 {
+            side = eval(c.pos.x + 1, c.pos.y, c.pos.z)
+            c.sides[.East] = side
+        }
+        if .East not_in c.opened {
+            append(chunks, side)
+            c.opened += {.East}
+        }
+        c = &allChunks[side]
     }
+    for x < 0 {
+        x += 32
+        side := c.sides[.West]
+        if side == -1 {
+            side = eval(c.pos.x - 1, c.pos.y, c.pos.z)
+            c.sides[.West] = side
+        }
+        if .West not_in c.opened {
+            append(chunks, side)
+            c.opened += {.West}
+        }
+        c = &allChunks[side]
+    }
+    for y >= 32 {
+        y -= 32
+        side := c.sides[.Up]
+        if side == -1 {
+            side = eval(c.pos.x, c.pos.y + 1, c.pos.z)
+            c.sides[.Up] = side
+            //skeewb.console_log(.INFO, "ah, %s", .Up in c.opened ? "true" : "false")
+        }
+        if .Up not_in c.opened {
+            append(chunks, side)
+            c.opened += {.Up}
+        }
+        c = &allChunks[side]
+    }
+    for y < 0 {
+        y += 32
+        side := c.sides[.Bottom]
+        if side == -1 {
+            side = eval(c.pos.x, c.pos.y - 1, c.pos.z)
+            c.sides[.Bottom] = side
+        }
+        if .Bottom not_in c.opened {
+            append(chunks, side)
+            c.opened += {.Bottom}
+        }
+        c = &allChunks[side]
+    }
+    for z >= 32 {
+        z -= 32
+        side := c.sides[.North]
+        if side == -1 {
+            side = eval(c.pos.x, c.pos.y, c.pos.z + 1)
+            c.sides[.North] = side
+        }
+        if .North not_in c.opened {
+            append(chunks, side)
+            c.opened += {.North}
+        }
+        c = &allChunks[side]
+    }
+    for z < 0 {
+        z += 32
+        side := c.sides[.South]
+        if side == -1 {
+            side = eval(c.pos.x, c.pos.y, c.pos.z - 1)
+            c.sides[.South] = side
+        }
+        if .South not_in c.opened {
+            append(chunks, side)
+            c.opened += {.South}
+        }
+        c = &allChunks[side]
+    }
+
+    c.primer[x][y][z] = id
 }
 
-placeTree :: proc(x, y, z: i32, c: ^Chunk) {
-    setBlock(x, y, z, 2, c)
+placeTree :: proc(x, y, z: i32, c: ^Chunk, chunks: ^[dynamic]int) {
+    setBlock(x, y, z, 2, c, chunks)
 
     for i := y + 1; i <= y + 5; i += 1 {
-        setBlock(x, i, z, 6, c)
+        setBlock(x, i, z, 6, c, chunks)
     }
 
     for i: i32 = x - 2; i <= x + 2; i += 1 {
@@ -168,7 +197,7 @@ placeTree :: proc(x, y, z: i32, c: ^Chunk) {
 
                 if xx && zz || i == x && j == z {continue}
 
-                setBlock(i, k, j, 7, c);
+                setBlock(i, k, j, 7, c, chunks);
             }
         }
     }
@@ -181,113 +210,131 @@ placeTree :: proc(x, y, z: i32, c: ^Chunk) {
 
                 if xx && zz || k == y + 5 && i == x && j == z {continue}
 
-                setBlock(i, k, j, 7, c);
+                setBlock(i, k, j, 7, c, chunks);
             }
         }
     }
 }
 
-populate :: proc(c: ^Chunk) {
-    x := c.pos.x
-    y := c.pos.y
-    z := c.pos.z
+populate :: proc(popChunks: ^[dynamic]int, chunks: ^[dynamic]int) {
+    for idx, i in popChunks {
+        c := &allChunks[idx]
 
-
-    state := rand.create(u64(math.abs(x * 263781623 + y * 3647463 + z)))
-    rnd := rand.default_random_generator(&state)
-    n := int(math.floor(3 * rand.float32(rnd) + 3))
-
-    for i in 0..<n {
-        x0 := u32(math.floor(32 * rand.float32(rnd)))
-        z0 := u32(math.floor(32 * rand.float32(rnd)))
-
-        toPlace := false
-        y0: u32 = 0
-        for j in 0..<32 {
-            y0 = u32(j)
-            if c.primer[x0][j][z0] == 3 {
-                toPlace = true
-                break
+        x := c.pos.x
+        y := c.pos.y
+        z := c.pos.z
+        
+        state := rand.create(u64(math.abs(x * 263781623 + y * 3647463 + z)))
+        rnd := rand.default_random_generator(&state)
+        n := int(math.floor(3 * rand.float32(rnd) + 3))
+        
+        for i in 0..<n {
+            x0 := u32(math.floor(32 * rand.float32(rnd)))
+            z0 := u32(math.floor(32 * rand.float32(rnd)))
+        
+            toPlace := false
+            y0: u32 = 0
+            for j in 0..<32 {
+                y0 = u32(j)
+                if c.primer[x0][j][z0] == 3 {
+                    toPlace = true
+                    break
+                }
+            }
+        
+            if toPlace {
+                placeTree(i32(x0), i32(y0), i32(z0), c, chunks)
             }
         }
 
-        if toPlace {
-            placeTree(i32(x0), i32(y0), i32(z0), c)
-        }
+        c.level = 2
     }
 }
 
-getHeightMap :: proc(x, z: i32) -> HeightMap {
-    height: HeightMap
-
-    for i in 0..<32 {
-        for j in 0..<32 {
-            height[i][j] = getTerrain(x, z, i, j)
-        }
-    }
-
-    return height
-}
-
-eval :: proc(x, y, z: i32) -> (Chunk, int) {
+eval :: proc(x, y, z: i32) -> int {
     pos := iVec3{x, y, z}
     idx, ok, _ := util.map_force_get(&chunkMap, pos)
     chunk := new(Chunk)
     defer free(chunk)
     if ok {
-        terrain := getHeightMap(x, z)
+        //terrain := terrain.getHeightMap(x, z)
         idx^ = len(allChunks)
-        chunk^ = getNewChunk(idx^, x, y, z, terrain)
+        chunk^ = getNewChunk(idx^, x, y, z)
+        setBlocksChunk(chunk, terrain.getHeightMap(x, z))
         append(&allChunks, chunk^)
     }
-    return allChunks[idx^], idx^
+    return idx^
 }
 
-addChunk :: proc(x, y, z: i32, toAdd: bool, chunks, chunksToView: ^[dynamic]Chunk) -> bool {
-    _, idx := eval(x, y, z)
-    chunk := &allChunks[idx]
-    append(chunks, chunk^)
-    if toAdd {
-        append(chunksToView, chunk^)
-    }
-
-    return .Up in chunk.opened
+length :: proc(v: iVec3) -> i32 {
+    return i32((v.x * v.x + v.y * v.y + v.z * v.z))
 }
 
-// firstpass :: proc(x, y, z, radius) -> [dynamic]Node {
+VIEW_DISTANCE :: 6
 
-// }
+addWorm :: proc(pos, center: iVec3, history: ^map[iVec3]bool) -> bool {
+    if abs(pos.x - center.x) > VIEW_DISTANCE + 2 || abs(pos.y - center.y) > VIEW_DISTANCE + 2 || abs(pos.z - center.z) > VIEW_DISTANCE + 2 {return false}
 
-peak :: proc(x, y, z: i32, radius: i32) -> [dynamic]Chunk {
+    if pos in history {return false}
+
+    //skeewb.console_log(.INFO, "added: %d, %d, %d", pos.x, pos.y, pos.z)
+
+    history[pos] = true
+
+    return true
+}
+
+peak :: proc(x, y, z: i32) -> [dynamic]Chunk {
     chunksToView := [dynamic]Chunk{}
-    chunks := [dynamic]Chunk{}
-    defer delete(chunks)
-    r := radius + 1
+    //chunks := [dynamic]Chunk{}
+    //defer delete(chunks)
+    chunksToSide := [dynamic]int{}
+    defer delete(chunksToSide)
+    chunksToPopulate := [dynamic]int{}
+    defer delete(chunksToPopulate)
+    r: i32 = VIEW_DISTANCE + 2
+    rr: i32 = VIEW_DISTANCE + 1
 
-    for i := -r; i <= r; i += 1 {
-        for j := -r; j <= r; j += 1 {
-            toAdd := (i != -r && i != r) && (j != -r && j != r)
-            open := addChunk(x + i, 0, z + j, toAdd, &chunks, &chunksToView)
-            opened := open
-            k := 1
-            for opened {
-                opened = addChunk(x + i, i32(k), z + j, toAdd, &chunks, &chunksToView)
-                k += 1
-            }
-            opened = open
-            k = -1
-            for opened {
-                opened = addChunk(x + i, i32(k), z + j, toAdd, &chunks, &chunksToView)
-                k -= 1
-            }
+    worms: [dynamic]iVec3 = {{x, y, z}}
+    defer delete(worms)
+    history := make(map[iVec3]bool)
+    defer delete(history)
+    history[worms[0]] = true
+
+    for i := 0; i < len(worms); i += 1 {
+        worm := worms[i]
+        idx := eval(worm.x, worm.y, worm.z)
+        append(&chunksToSide, idx)
+        c := &allChunks[idx]
+        // if c.level == 0 {setBlocksChunk(c, terrain.getHeightMap(worm.x, worm.z))}
+        if c.level == 1 && abs(worm.x - x) < VIEW_DISTANCE + 1 && abs(worm.y - y) < VIEW_DISTANCE + 1 && abs(worm.z - z) < VIEW_DISTANCE + 1 {append(&chunksToPopulate, idx)}
+
+        if .West in c.opened && addWorm(worm + {-1, 0, 0}, {x, y, z}, &history) {
+            append(&worms, iVec3{worm.x - 1, worm.y, worm.z})
+        }
+        if .East in c.opened && addWorm(worm + { 1, 0, 0}, {x, y, z}, &history) {
+            append(&worms, iVec3{worm.x + 1, worm.y, worm.z})
+        }
+        if .Bottom in c.opened && addWorm(worm + { 0,-1, 0}, {x, y, z}, &history) {
+            append(&worms, iVec3{worm.x, worm.y - 1, worm.z})
+        }
+        if .Up in c.opened && addWorm(worm + { 0, 1, 0}, {x, y, z}, &history) {
+            append(&worms, iVec3{worm.x, worm.y + 1, worm.z})
+        }
+        if .South in c.opened && addWorm(worm + { 0, 0,-1}, {x, y, z}, &history) {
+            append(&worms, iVec3{worm.x, worm.y, worm.z - 1})
+        }
+        if .North in c.opened && addWorm(worm + { 0, 0, 1}, {x, y, z}, &history) {
+            append(&worms, iVec3{worm.x, worm.y, worm.z + 1})
         }
     }
 
-    for chunk in chunks {
-        p := populated[chunk.pos]
-        if p {continue}
-        populate(&allChunks[chunk.id])
-        populated[chunk.pos] = true
+    populate(&chunksToPopulate, &chunksToSide)
+
+    for idx in chunksToSide {
+        chunk := allChunks[idx]
+        dist := chunk.pos - iVec3{x, y, z}
+        if abs(dist.x) < VIEW_DISTANCE && abs(dist.y) < VIEW_DISTANCE && abs(dist.z) < VIEW_DISTANCE {append(&chunksToView, chunk)}
     }
 
     return chunksToView
@@ -300,7 +347,7 @@ getPosition :: proc(pos: iVec3) -> (int, iVec3) {
         i32(math.floor(f32(pos.z) / 32))
     }
 
-    _, idx := eval(chunkPos.x, chunkPos.y, chunkPos.z)
+    idx := eval(chunkPos.x, chunkPos.y, chunkPos.z)
 
     iPos: iVec3
     iPos.x = pos.x %% 32
@@ -409,7 +456,7 @@ atualizeChunks :: proc(chunk: ^Chunk, pos: iVec3) -> [dynamic]^Chunk {
                     chunk.pos.y + i32(j) * offsetY,
                     chunk.pos.z + i32(k) * offsetZ
                 }
-                _, idx := eval(chunkPos.x, chunkPos.y, chunkPos.z)
+                idx := eval(chunkPos.x, chunkPos.y, chunkPos.z)
 
                 append(&chunks, &allChunks[idx])
             }
@@ -429,11 +476,13 @@ destroy :: proc(origin, direction: vec3) -> ([dynamic]^Chunk, iVec3, bool) {
         chunk.opened += {.West}
     } else if pos.x == 31 {
         chunk.opened += {.East}
-    } else if pos.y == 0 {
+    }
+    if pos.y == 0 {
         chunk.opened += {.Bottom}
     } else if pos.y == 31 {
         chunk.opened += {.Up}
-    } else if pos.z == 0 {
+    }
+    if pos.z == 0 {
         chunk.opened += {.South}
     } else if pos.z == 31 {
         chunk.opened += {.North}
@@ -450,6 +499,21 @@ place :: proc(origin, direction: vec3) -> ([dynamic]^Chunk, iVec3, bool) {
 
     if !ok {return chunks, pos, false}
     chunk.primer[pos.x][pos.y][pos.z] = 5
+    if pos.x == 0 {
+        chunk.opened += {.West}
+    } else if pos.x == 31 {
+        chunk.opened += {.East}
+    }
+    if pos.y == 0 {
+        chunk.opened += {.Bottom}
+    } else if pos.y == 31 {
+        chunk.opened += {.Up}
+    }
+    if pos.z == 0 {
+        chunk.opened += {.South}
+    } else if pos.z == 31 {
+        chunk.opened += {.North}
+    }
     
     chunks = atualizeChunks(chunk, pos)
 
