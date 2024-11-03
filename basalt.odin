@@ -19,29 +19,6 @@ import "sky"
 
 import "tracy"
 
-// @(export)
-// load :: proc"c"(core: ^skeewb.core_interface) -> skeewb.module_desc {
-// 	context = runtime.default_context()
-
-// 	core.event_listen("start", skeewb.event_callback(start));
-// 	core.event_listen("loop", skeewb.event_callback(loop));
-// 	core.event_listen("quit", skeewb.event_callback(quit));
-
-// 	return (skeewb.module_desc) {
-// 		modid = "basalt",
-// 		version = {0, 0, 1},
-// 		interface = nil,
-// 	}
-// }
-
-lastTimeTicks := time.tick_now()
-nbFrames := 0
-fps := 0
-
-start_tick: time.Tick
-
-window: ^sdl2.Window
-gl_context: sdl2.GLContext
 screenWidth: i32 = 854
 screenHeight: i32 = 480
 
@@ -55,15 +32,8 @@ playerCamera := util.Camera{
 	math.MATRIX4F32_IDENTITY, math.MATRIX4F32_IDENTITY
 }
 
-blockRender := worldRender.Render{{}, 0, 0}
-fboRender := frameBuffer.Render{0, 0, 0, {}, 0, 0, 0}
-skyRender := sky.Render{0, 0, {}, 0, 0}
-sunRender := sky.Render{0, 0, {}, 0, 0}
-
 chunks: [dynamic]worldRender.ChunkBuffer
 allChunks: [dynamic]worldRender.ChunkBuffer
-
-tracking_allocator: ^mem.Tracking_Allocator
 
 cameraSetup :: proc() {
 	playerCamera.proj = math.matrix4_infinite_perspective_f32(45, playerCamera.viewPort.x / playerCamera.viewPort.y, 0.1)
@@ -73,14 +43,24 @@ cameraMove :: proc() {
 	playerCamera.view = math.matrix4_look_at_f32({0, 0, 0}, playerCamera.front, playerCamera.up)
 }
 
+reloadChunks :: proc() {
+	if allChunks != nil {delete(allChunks)}
+	if chunks != nil {delete(chunks)}
+	tmp := world.peak(playerCamera.chunk.x, playerCamera.chunk.y, playerCamera.chunk.z)
+	defer delete(tmp)
+	allChunks = worldRender.setupManyChunks(tmp)
+	worldRender.frustumMove(&allChunks, &playerCamera)
+	chunks = worldRender.frustumCulling(allChunks, &playerCamera)
+}
+
 main :: proc() {
 	context = runtime.default_context()
 
-	tracking_allocator = new(mem.Tracking_Allocator)
+	tracking_allocator := new(mem.Tracking_Allocator)
 	mem.tracking_allocator_init(tracking_allocator, context.allocator)
 	context.allocator = mem.tracking_allocator(tracking_allocator)
 	
-	start_tick = time.tick_now()
+	start_tick := time.tick_now()
 
 	sdl2.Init(sdl2.INIT_EVERYTHING)
 
@@ -89,16 +69,16 @@ main :: proc() {
 	sdl2.GL_SetAttribute(sdl2.GLattr.CONTEXT_PROFILE_MASK, i32(sdl2.GLprofile.CORE))
 
 
-	window = sdl2.CreateWindow("testando se muda alguma coisa", sdl2.WINDOWPOS_CENTERED, sdl2.WINDOWPOS_CENTERED, screenWidth, screenHeight, sdl2.WINDOW_RESIZABLE | sdl2.WINDOW_OPENGL)
-	if (window == nil) {
+	window := sdl2.CreateWindow("testando se muda alguma coisa", sdl2.WINDOWPOS_CENTERED, sdl2.WINDOWPOS_CENTERED, screenWidth, screenHeight, sdl2.WINDOW_RESIZABLE | sdl2.WINDOW_OPENGL)
+	if window == nil {
 		skeewb.console_log(.ERROR, "could not create a window sdl error: %s", sdl2.GetError())
 	}
 	skeewb.console_log(.INFO, "successfully created a window")
 
 	sdl2.SetRelativeMouseMode(true)
 
-	gl_context = sdl2.GL_CreateContext(window);
-	if (gl_context == nil) {
+	gl_context := sdl2.GL_CreateContext(window);
+	if gl_context == nil {
 		skeewb.console_log(.ERROR, "could not create an OpenGL context sdl error: %s", sdl2.GetError())
 	}
 	skeewb.console_log(.INFO, "successfully created an OpenGL context")
@@ -112,6 +92,11 @@ main :: proc() {
 	gl.CullFace(gl.BACK)
 	gl.Enable(gl.BLEND)
 	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+
+	blockRender := worldRender.Render{{}, 0, 0}
+	fboRender := frameBuffer.Render{0, 0, 0, {}, 0, 0, 0}
+	skyRender := sky.Render{0, 0, {}, 0, 0}
+	sunRender := sky.Render{0, 0, {}, 0, 0}
 
 	worldRender.setupDrawing(&blockRender)
 
@@ -132,6 +117,15 @@ main :: proc() {
 	worldRender.frustumMove(&allChunks, &playerCamera)
 	chunks = worldRender.frustumCulling(allChunks, &playerCamera)
 
+	lastTimeTicks := time.tick_now()
+	nbFrames := 0
+	fps := 0
+	
+	toFront := false
+	toBehind := false
+	toRight := false
+	toLeft := false
+
 	loop: for {
 		tracy.FrameMark()
 		duration := time.tick_since(start_tick)
@@ -141,12 +135,10 @@ main :: proc() {
 			
 		for sdl2.PollEvent(&event) {
 			if event.type == .QUIT || event.type == .WINDOWEVENT && event.window.event == .CLOSE {
-				quit()
 				break loop
 			} else if event.type == .KEYUP {
 				#partial switch (event.key.keysym.sym) {
 					case .ESCAPE:
-						quit()
 						break loop
 					case .W:
 						toFront = false
@@ -160,7 +152,6 @@ main :: proc() {
 			} else if event.type == .KEYDOWN {
 				#partial switch (event.key.keysym.sym) {
 					case .ESCAPE:
-						quit()
 						break loop
 					case .W:
 						toFront = true
@@ -307,36 +298,6 @@ main :: proc() {
 		}
 		sdl2.SetWindowTitle(window, strings.unsafe_string_to_cstring(fmt.tprintfln("FPS: %d", fps)))
 	}
-}
-
-toFront := false
-toBehind := false
-toRight := false
-toLeft := false
-
-yaw: f32 = -90.0;
-pitch: f32 = 0.0;
-
-lastChunkX := playerCamera.chunk.x
-lastChunkY := playerCamera.chunk.y
-lastChunkZ := playerCamera.chunk.z
-
-reloadChunks :: proc() {
-	if allChunks != nil {delete(allChunks)}
-	if chunks != nil {delete(chunks)}
-	tmp := world.peak(playerCamera.chunk.x, playerCamera.chunk.y, playerCamera.chunk.z)
-	defer delete(tmp)
-	allChunks = worldRender.setupManyChunks(tmp)
-	worldRender.frustumMove(&allChunks, &playerCamera)
-	chunks = worldRender.frustumCulling(allChunks, &playerCamera)
-}
-
-last: time.Tick
-cameraSpeed: f32 = 0.0125
-
-quit :: proc(){
-	context = runtime.default_context()
-    //tracy.Zone()
 	
 	prev_allocator := context.allocator
 	context.allocator = mem.tracking_allocator(tracking_allocator)
@@ -390,6 +351,16 @@ quit :: proc(){
 		skeewb.console_log(.INFO, fmt.tprintf("%v allocation %p was freed badly\n", bad_free.location, bad_free.memory))
 	}
 }
+
+yaw: f32 = -90.0;
+pitch: f32 = 0.0;
+
+lastChunkX := playerCamera.chunk.x
+lastChunkY := playerCamera.chunk.y
+lastChunkZ := playerCamera.chunk.z
+
+last: time.Tick
+cameraSpeed: f32 = 0.0125
 
 // @(instrumentation_enter)
 // tracy_enter :: proc "contextless" (proc_address, call_site_return_address: rawptr, loc: runtime.Source_Code_Location) {
