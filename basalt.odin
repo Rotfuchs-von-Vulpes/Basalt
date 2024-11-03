@@ -57,6 +57,7 @@ main :: proc() {
 	context = runtime.default_context()
 
 	tracking_allocator := new(mem.Tracking_Allocator)
+	defer free(tracking_allocator)
 	mem.tracking_allocator_init(tracking_allocator, context.allocator)
 	context.allocator = mem.tracking_allocator(tracking_allocator)
 	
@@ -302,7 +303,6 @@ main :: proc() {
 	prev_allocator := context.allocator
 	context.allocator = mem.tracking_allocator(tracking_allocator)
 
-	defer free(tracking_allocator)
 	defer context.allocator = prev_allocator
 	defer mem.tracking_allocator_destroy(tracking_allocator)
 	
