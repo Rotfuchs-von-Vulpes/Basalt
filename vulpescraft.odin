@@ -1,4 +1,4 @@
-package basalt
+package vulpescraft
 
 import "core:fmt"
 import "core:strings"
